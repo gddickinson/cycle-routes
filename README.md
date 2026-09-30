@@ -334,7 +334,7 @@ Issues and pull requests are welcome. Before opening a PR:
 - Canopy: Meta & World Resources Institute (CC BY 4.0). Noise: US DOT/BTS. Traffic:
   TxDOT. City data: City of Austin Open Data Portal. Weather: [Open-Meteo](https://open-meteo.com/) (CC BY 4.0).
 - Parts of the GPS and tracking code come from the author's
-  [gps-tracker](https://github.com/gddickinson/gps-tracker) and pyNav projects.
+  [gps-tracker](https://github.com/gddickinson/gps-tracker) and [pyNav](https://github.com/gddickinson/pyNav) projects.
 - Bundled libraries: [Leaflet](https://leafletjs.com/) and
   [protomaps-leaflet](https://github.com/protomaps/protomaps-leaflet) (BSD licences in `web/vendor/`).
 
