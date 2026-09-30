@@ -20,6 +20,7 @@ from cycleroutes.export.formats import to_gpx
 from cycleroutes.export.print_map import route_pdf
 from cycleroutes.routing.combine import extend_route
 from cycleroutes.routing.loops import generate_loops
+from cycleroutes.routing.planner import STOP_TYPES, plan_trip
 from cycleroutes.routing.tours import generate_tour
 from cycleroutes.routing.rating import rate
 from cycleroutes.routing.context import AVOID_TYPES, BIKE_AVOID, BIKE_TYPES, WALK_AVOID
@@ -174,6 +175,41 @@ def extend(rid: str, body: dict = Body(...), bike: str = "hybrid", depart: str |
                          "back to start" if body.get("after") == "return" else "",
                          "to your destination" if body.get("after") == "destination" else "") if x]
     return _store(r, rate(r), info, f"{base_title} ({', '.join(extra)})" if extra else base_title)
+
+
+@app.post("/api/trip")
+def trip(body: dict = Body(...), bike: str = "hybrid", depart: str | None = None, weather: bool = True,
+         closures: bool = True, avoid: str | None = None, infra_only: bool = False, data: str = "all",
+         reports: bool = True, mode: str = "bike"):
+    """Trip builder: a route (A->B or loop) of a chosen length with chosen kinds of stops."""
+    from cycleroutes.api.planning_api import _stop_features
+    s = state()
+    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only, data, reports, mode)
+    pt = lambda v: tuple(float(x) for x in v) if v else None     # noqa: E731
+    start, end = pt(body.get("start")), pt(body.get("end"))
+    if start is None:
+        raise HTTPException(400, "A start point is required")
+    profile = body.get("profile") or ("balanced" if mode == "bike" else "balanced")
+    if profile not in config.MODES[mode]:
+        raise HTTPException(400, f"Unknown {mode} profile '{profile}'")
+    target = float(body["target_km"]) if body.get("target_km") else None
+    stops = [(x.get("type"), x.get("count", 1)) for x in body.get("stops", [])]
+    unknown = [k for k, _ in stops if k not in STOP_TYPES]
+    if unknown:
+        raise HTTPException(400, f"Unknown stop type(s): {', '.join(unknown)}")
+    results = plan_trip(s.router_for(mode), start, end, target, stops, _stop_features(), profile, ctx)
+    out = []
+    for route, placed in results:
+        names = ", ".join(p["stop_label"].lower() for p in placed[:4])
+        title = (f"{route.length_m / 1000:.0f} km {'loop' if end is None else 'trip'}"
+                 + (f" via {names}" if names else ""))
+        out.append(_store(route, rate(route), info, title))
+    return out
+
+
+@app.get("/api/stop-types")
+def stop_types():
+    return {k: label for k, (label, _) in STOP_TYPES.items()}
 
 
 @app.get("/api/suggested")

@@ -65,6 +65,11 @@ Build it for an area with `cycleroutes walk` (after `cycleroutes build`).
 ## GPS riding & tracking
 - **Ride this route**: turn-by-turn banner with **voice guidance** (next turn, distance, remaining,
   off-route warning, one-tap reroute), phone screen kept awake, **share live location** link.
+  *More › Voice guidance*: pick any installed voice, speed, pitch, volume, how much it says
+  (turns only / normal / plus progress updates at 25-50-75%) and a chime; *Test voice* to hear it.
+- **Length & stops**: on A→B, *Make it about N km* stretches the trip to that length; on A→B and
+  loops, tap stop chips (café, ice cream, food, water, toilets, park, sight, bike shop, grocery,
+  swimming, bike share; tap again for 2 or 3) and real places are spread evenly along the route.
 - **Record a ride** and **My rides**: GPS track saved (SQLite), GPX/CSV export, the streets you
   actually rode are rated, and a heatmap shows how much of the network you have covered.
 - **External GPS**: a USB/serial NMEA receiver (e.g. `hardware/gps_i2c_serial` Arduino sketch):

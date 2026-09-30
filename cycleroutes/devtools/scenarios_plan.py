@@ -66,6 +66,8 @@ def layers_and_menu(sess: ShotSession, url: str, pts: Points) -> None:
     for name in ("crashes", "workzones", "bikeshare", "counters"):
         sess.page.uncheck(f"[data-layer={name}]")
 
+    sess.page.wait_for_function("() => document.querySelector('#network-score').textContent.includes('/100')",
+                                timeout=90000)     # computed once per area, then cached
     score = sess.page.inner_text("#network-score")
     sess.check("Network score shown", "/100" in score, score[:80])
     sess.check("Data sources listed", "3DEP" in sess.page.inner_text("#sources"))

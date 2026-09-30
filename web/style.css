@@ -234,3 +234,9 @@ body.picking #map { cursor: crosshair; }
 body.picking .leaflet-marker-pane, body.picking .leaflet-overlay-pane,
 body.picking .leaflet-tooltip-pane, body.picking .leaflet-popup-pane { pointer-events: none; }
 body.picking .leaflet-marker-pane *, body.picking .leaflet-overlay-pane * { pointer-events: none !important; }
+.stop-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 8px; }
+.stop-chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 14px;
+  padding: 4px 9px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.stop-chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.small-note { font-size: 12.5px; margin-top: 6px; }
+.stop-pin { background: #fff; color: #000; font-size: 14px; border: 2px solid #b5179e; }

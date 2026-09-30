@@ -126,3 +126,13 @@ engine (GraphHopper). Docker image written but not built (daemon not running).
 - Fixes: taps while choosing a point were swallowed by route lines/markers (now pass through);
   suggested titles showed the target distance, not the actual one; saved snapshots lost the parts.
 - Tests 74; screenshot suite 53 screenshots / 113 checks, all passing.
+
+## 2026-09-30 — Voice options and trip builder (length & stops)
+- The speech the user heard came from the headless screenshot ride scenario using macOS TTS; the
+  screenshot tool now silences speechSynthesis (records what would be said in window.__spoken).
+- Voice options (More › Voice guidance): voice, speed, pitch, volume, detail level (minimal /
+  normal / chatty with 25-50-75% progress), chime, test button; saved per device.
+- Trip builder: `routing/planner.py` + `/api/trip` + `js/trip.js`. A→B stretched to a target length
+  (via points on an ellipse), loops of any length, 11 stop types with counts, spread evenly along
+  the route; missing stop types reported.
+- Tests 79; screenshot suite 56 screenshots / 121 checks, all passing.

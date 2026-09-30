@@ -87,6 +87,7 @@ flattest, quiet, trails, mtb, shady, balanced), `TRAIL_FILTERS` (extra OSM ways:
 | `rating.py` | `rate()` — ratings incl. shade; trail %, MTB grade, avoided km, crashes, crossings, busiest AADT, noise |
 | `directions.py` | `cue_sheet()` with service-road jog merging |
 | `catalog.py` | suggested rides from centre + reachable parks |
+| `planner.py` | `plan_trip()` (A→B stretched to a target length or a loop, with real stops spread along it: café, water, park…), `STOP_TYPES`, `choose_stops()` |
 | `combine.py` | `extend_route()` (approach → route joined at start/nearest → stops → end/return/destination, with leg bounds), `route_from_edges()` (saved snapshots) |
 | `stops.py` | `along(route, features)`, `longest_dry_stretch()` |
 | `stages.py` | `split_stages(route, km_per_day, stays)` |
@@ -127,7 +128,7 @@ map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 | `serialize.py` | `route_payload()` |
 
 ### `cycleroutes/devtools/` — `cycleroutes screenshots`
-`session.py` (ShotSession), `scenarios.py`, `scenarios_plan.py`, `scenarios_ride.py`, `scenarios_walk.py`, `scenarios_extend.py`, `scenarios_offline.py`, `report.py`, `screenshots.py`.
+`session.py` (ShotSession), `scenarios.py`, `scenarios_plan.py`, `scenarios_ride.py`, `scenarios_walk.py`, `scenarios_extend.py`, `scenarios_trip.py`, `scenarios_offline.py`, `report.py`, `screenshots.py`.
 
 ### `cycleroutes/cli.py`
 `build | walk | sources | offline | catalog | amenities | route | loop | gps | screenshots | serve [--https --serial-gps --ip-location]`.
@@ -142,13 +143,15 @@ map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 | `js/settings.js` | `Settings` (bike, depart, weather, closures, conditions), `planLink`, `readLink` |
 | `js/map.js` | `RouteMap`: layers, pins, via pins, stops, position, tracks, amenities |
 | `js/layers.js` | `Layers`: open-data layers + press-and-hold menu (hazard, feedback, places) |
+| `js/trip.js` | `TripBuilder`: target length + stop chips (tap to cycle 0–3) for A→B and loops, via `/api/trip` |
+| `js/voice.js` | `Voice`: voice choice, speed, pitch, volume, how much it says, chime, test button (More › Voice guidance) |
 | `js/plan.js` | `Plan`: via points, places, favourites, stops/weather details, stages, compare |
 | `js/cards.js` | `renderCards` (ratings, open-data facts, print menu, save/link) |
 | `js/ride.js` | `RideController`: GPS feed, navigation banner, voice, reroute, live share |
 | `js/rides.js`, `js/search.js`, `js/more.js`, `js/sources.js` | rides list, place search, More tab (score, regions, offline), data-sources panel |
 
 ## Tests (`tests/`, offline)
-`test_scoring`, `test_routing`, `test_api`, `test_tracking`, `test_sources`, `test_planning`, `test_road_options`, `test_offline`, `test_data_sources`, `test_walking`, `test_combine`
+`test_scoring`, `test_routing`, `test_api`, `test_tracking`, `test_sources`, `test_planning`, `test_road_options`, `test_offline`, `test_data_sources`, `test_walking`, `test_combine`, `test_planner`
 (synthetic 6×6 grid in `conftest.py`; weather stubbed).
 
 ## Other

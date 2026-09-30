@@ -1,6 +1,7 @@
 // Result cards: rating bars, stress mix, facts from open data, elevation, cue sheet,
 // and actions (ride, print, GPX, save, share link).
 
+import { stopList } from "./trip.js";
 import { esc } from "./util.js";
 
 const RATINGS = [
@@ -86,7 +87,7 @@ function details(r, colors) {
     ${elevationSvg(r.elevation)}
     <div class="facts">↑ ${s.ascent_m} m · ↓ ${s.descent_m} m · max ${s.max_grade_pct}% ·
       ${s.bike_infra_pct}% bike infrastructure · ${s.scenic_pct}% by parks/water</div>
-    ${legList(r)}${tourList(r)}${walkFacts(s)}${dataFacts(s)}${routes}
+    ${legList(r)}${stopList(r)}${tourList(r)}${walkFacts(s)}${dataFacts(s)}${routes}
     <div class="actions">${ride}
       <select class="print-select" data-act="print" aria-label="Print">
         <option value="">🖨 Print…</option><option value="standard">Overview map</option>

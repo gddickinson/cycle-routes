@@ -18,7 +18,7 @@ _basemaps: dict[str, LocalBasemap] = {}
 # Exactly the URLs the page requests, so the service worker can answer them offline.
 PRECACHE_API = ["/api/region", "/api/offline/status", "/api/gps/sources", "/api/conditions?bike=hybrid",
                 "/api/amenities", "/api/hazard-types", "/api/places", "/api/favourites", "/api/rides",
-                "/api/network/score", "/api/sources"]
+                "/api/network/score", "/api/sources", "/api/stop-types"]
 PER_MODE = ["/api/network?mode={m}", "/api/suggested?mode={m}", "/api/layers/trails?mode={m}",
             "/api/layers/crashes?mode={m}", "/api/layers/stops?mode={m}", "/api/layers/counters?mode={m}"]
 

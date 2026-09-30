@@ -97,7 +97,7 @@ def desktop_core(sess: ShotSession, url: str, pts: Points) -> None:
     sess.check("Clicking a card selects it", _selected_id(sess) != before)
     sess.shot("ab_other_option", "Choosing another option redraws it on the map; others stay grey.")
 
-    sess.page.click("details.custom summary")
+    sess.page.click("details.custom:not(#ab-trip) summary")
     sess.page.fill("#w-safety", "5")
     sess.page.fill("#w-hills", "4")
     sess.page.click("#custom-go")

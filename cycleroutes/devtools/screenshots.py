@@ -22,7 +22,7 @@ from playwright.sync_api import sync_playwright
 
 from cycleroutes import config
 from cycleroutes.devtools import (scenarios, scenarios_extend, scenarios_offline, scenarios_plan, scenarios_ride,
-                                  scenarios_walk)
+                                  scenarios_trip, scenarios_walk)
 from cycleroutes.devtools.report import write_report
 from cycleroutes.devtools.session import Shot, ShotSession, write_manifest
 
@@ -79,6 +79,10 @@ def _launch(p):
 
 def _run_group(browser, name: str, context_opts: dict, out_dir: Path, shots: list[Shot], fn) -> None:
     ctx = browser.new_context(**context_opts)
+    # Automated runs must be silent: headless Chrome still speaks through the OS voice.
+    ctx.add_init_script("""(() => { if (window.speechSynthesis) {
+        window.speechSynthesis.speak = (u) => { window.__spoken = (window.__spoken || []).concat(u.text); };
+      } })();""")
     page = ctx.new_page()
     page.set_default_timeout(30000)
     sess = ShotSession(page, out_dir, name, shots)
@@ -112,6 +116,7 @@ def run(out_dir: Path, url: str | None = None, region: str = config.DEFAULT_REGI
                              ("race", scenarios_plan.stale_results_are_dropped)):
                 _run_group(browser, name, DESKTOP, out_dir, shots, lambda s, fn=fn: fn(s, base, pts))
             _run_group(browser, "walk", DESKTOP, out_dir, shots, lambda s: scenarios_walk.walking(s, base, pts))
+            _run_group(browser, "trip", DESKTOP, out_dir, shots, lambda s: scenarios_trip.trip_builder(s, base, pts))
             _run_group(browser, "extend", DESKTOP, out_dir, shots,
                        lambda s: scenarios_extend.extend_suggested(s, base, pts))
             _run_group(browser, "offline", DESKTOP, out_dir, shots,

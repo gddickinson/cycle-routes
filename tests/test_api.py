@@ -140,3 +140,15 @@ def test_extend_and_saved_snapshot_api(client, region):
     assert opened["stats"]["distance_km"] == r["stats"]["distance_km"] and opened["title"] == "Combined"
     assert [l["kind"] for l in opened["legs"]] == ["approach", "route", "onward"]     # parts kept
     client.delete(f"/api/favourites/{fav['id']}")
+
+
+def test_trip_api(client, region):
+    a, b = list(node_latlon(region, 0, 0)), list(node_latlon(region, 0, 5))
+    types = client.get("/api/stop-types").json()
+    assert "cafe" in types and "water" in types
+    res = client.post("/api/trip", json={"start": a, "end": b, "target_km": 2, "stops": [{"type": "water", "count": 1}]})
+    assert res.status_code == 200 and res.json()[0]["stats"]["distance_km"] > 0
+    loop = client.post("/api/trip", json={"start": a, "target_km": 2, "stops": []})
+    assert loop.status_code == 200 and loop.json()[0]["kind"] == "loop"
+    assert client.post("/api/trip", json={"start": a, "stops": [{"type": "unicorn"}]}).status_code == 400
+    assert client.post("/api/trip", json={"end": b}).status_code == 400

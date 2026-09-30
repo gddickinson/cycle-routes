@@ -95,6 +95,11 @@ export class RouteMap {
     const sel = routes.find((r) => r.id === selectedId);
     (sel?.tour || []).forEach((t, i) => L.marker([t.lat, t.lon], { icon: L.divIcon({ className: "", iconSize: [24, 24],
       html: `<div class="pin tour-pin">${i + 1}</div>` }) }).bindTooltip(t.name).addTo(this.routeLayer));
+    const emoji = { cafe: "☕", treat: "🍦", food: "🌮", water: "💧", toilets: "🚻", park: "🌳", sight: "📷",
+      bike_shop: "🔧", shop: "🛒", swim: "🏊", bike_share: "🚲" };
+    (sel?.planned_stops || []).forEach((t) => L.marker([t.lat, t.lon], { icon: L.divIcon({ className: "", iconSize: [26, 26],
+      html: `<div class="pin stop-pin">${emoji[t.stop_type] || "•"}</div>` }) })
+      .bindTooltip(`${t.name || t.stop_label} · ${t.at_km.toFixed(1)} km`).addTo(this.routeLayer));
     if (sel) {
       const halo = L.geoJSON(sel.geojson, { renderer: this.renderer, interactive: false,
         style: { color: "#fff", weight: 9, opacity: 0.95 } }).addTo(this.routeLayer);

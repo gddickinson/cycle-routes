@@ -80,6 +80,8 @@ def ride(sess: ShotSession, url: str, pts: Points) -> None:
     sess.check("Remaining distance and progress shown", "to go" in meta and "%" in meta, meta)
     sess.check("Position dot drawn", sess.page.locator("path.leaflet-interactive, canvas").count() > 0)
     sess.check("Sheet collapsed while riding", "collapsed" in (sess.page.get_attribute("#panel", "class") or ""))
+    spoken = sess.page.evaluate("window.__spoken || []")
+    sess.check("Voice prompts generated (silently in tests)", any("Starting" in t for t in spoken), str(spoken[:3]))
     sess.shot("riding", "Riding a route on a phone: big next-turn banner, distance, progress; sheet tucked away.")
 
     here = _along(coords, 0.4)

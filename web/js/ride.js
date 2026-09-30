@@ -33,7 +33,7 @@ export class RideController {
       this.voice = !this.voice;
       remember("voice", this.voice);
       this.renderVoice();
-      if (this.voice) this.say("Voice guidance on");
+      if (this.voice) this.say("Voice guidance on", "start");
     });
     this.renderVoice();
   }
@@ -50,7 +50,7 @@ export class RideController {
     this.showBanner();
     this.spoken = new Set();
     this.renderIdle(route ? "Waiting for GPS…" : "Recording — waiting for GPS…");
-    if (route) this.say(`Starting ${route.title}. ${route.cues?.[0]?.instruction || ""}`);
+    if (route) this.say(`Starting ${route.title}. ${route.cues?.[0]?.instruction || ""}`, "start");
     this.flushTimer = setInterval(() => this.flush(), FLUSH_MS);
     this.startFeed();
     this.keepAwake();
@@ -148,22 +148,24 @@ export class RideController {
     $("#nav-voice").setAttribute("aria-pressed", String(this.voice));
   }
 
-  say(text) {
-    if (!this.voice || !("speechSynthesis" in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-    } catch { /* speech unavailable */ }
+  say(text, kind = "turn-now") {
+    if (!this.voice || !this.voiceEngine?.wants(kind)) return;
+    this.voiceEngine.speak(text);
   }
 
   /** Speak each cue once at ~200 m and again at ~40 m; announce off-route and arrival once. */
   announce(nav) {
     const cue = nav.next_cue;
-    if (nav.arrived && !this.spoken.has("arrived")) { this.spoken.add("arrived"); this.say("You have arrived"); return; }
+    if (nav.arrived && !this.spoken.has("arrived")) { this.spoken.add("arrived"); this.say("You have arrived", "arrived"); return; }
     if (nav.off_route && !this.spoken.has(`off-${this.route?.id}`)) {
       this.spoken.add(`off-${this.route?.id}`);
-      this.say("You are off the route. Tap reroute, or head back to the line.");
+      this.say("You are off the route. Tap reroute, or head back to the line.", "off-route");
       return;
+    }
+    const pct = Math.floor(nav.fraction * 4) * 25;        // chatty: 25 / 50 / 75 % updates
+    if (pct > 0 && pct < 100 && !this.spoken.has(`pct-${pct}`)) {
+      this.spoken.add(`pct-${pct}`);
+      this.say(`${pct} percent done, ${Math.round(nav.remaining_m / 100) / 10} kilometres to go`, "progress");
     }
     if (!cue || nav.distance_to_cue_m == null) return;
     const key = `${this.route?.id}-${cue.at_km}`;
@@ -173,7 +175,7 @@ export class RideController {
       this.say(cue.instruction);
     } else if (d <= 220 && d > 60 && !this.spoken.has(`${key}-soon`)) {
       this.spoken.add(`${key}-soon`);
-      this.say(`In ${Math.round(d / 50) * 50} metres, ${cue.instruction}`);
+      this.say(`In ${Math.round(d / 50) * 50} metres, ${cue.instruction}`, "turn-soon");
     }
   }
 

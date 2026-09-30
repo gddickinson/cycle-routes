@@ -8,6 +8,8 @@ import { Plan } from "./plan.js";
 import { RideController } from "./ride.js";
 import { renderRides, summaryHtml } from "./rides.js";
 import { attachSearch } from "./search.js";
+import { TripBuilder } from "./trip.js";
+import { Voice } from "./voice.js";
 import { Settings, planLink, readLink } from "./settings.js";
 import { $, api, copyText, del, esc, fmt, post, recall, remember } from "./util.js";
 
@@ -20,7 +22,7 @@ const INPUTS = { start: "#start-input", end: "#end-input", loop: "#loop-input" }
 const state = { tab: "ab", start: null, end: null, loopStart: null, routes: [], selected: null,
   mode: recall("mode", "bike") };
 const app = { state, api, post, setStatus };
-let region, rmap, rider, settings, plan;
+let region, rmap, rider, settings, plan, trips;
 
 function setStatus(text, error = false) {
   const el = $("#status");
@@ -164,6 +166,15 @@ function customRoute() {
     .map((r) => ({ ...r, title: "Your mix" })), abRequest("custom"));
 }
 
+function tripAB() {
+  if (!needPoints()) return;
+  const target = trips.abTargetKm();
+  if (!target && !trips.hasStops()) { setStatus("Choose a length and/or some stops first", true); return; }
+  run("Planning your trip…", () => post(`/api/trip?${settings.query()}`, {
+    start: state.start, end: state.end, target_km: target, stops: trips.stops(),
+    profile: state.mode === "walk" ? "balanced" : "scenic" }), abRequest("trip"));
+}
+
 function learnedRoute() {
   if (!needPoints()) return;
   run("Routing the way you usually ride…", async () => [await api(`/api/route?${pointsQuery()}&profile=learned`)]
@@ -178,6 +189,10 @@ function generateLoops() {
     return run(`Planning a ${km} km tour of ${n} sights…`, async () =>
       [await api(`/api/tour?start=${fmt(state.loopStart)}&km=${km}&stops=${n}&${settings.query()}`)],
     { loop: state.loopStart, km, profile });
+  }
+  if (trips.hasStops()) {
+    return run(`Planning ${km} km loops with your stops…`, () => post(`/api/trip?${settings.query()}`,
+      { start: state.loopStart, target_km: +km, stops: trips.stops(), profile }), { loop: state.loopStart, km, profile });
   }
   run(`Generating ${km} km loops…`, () =>
     api(`/api/loop?start=${fmt(state.loopStart)}&km=${km}&profile=${profile}&count=3&${settings.query()}`),
@@ -295,6 +310,7 @@ function setMode(mode) {
   if (mode === "walk" && +$("#loop-km").value > 10) { $("#loop-km").value = 5; $("#loop-km-val").textContent = 5; }
   fillLoopProfiles();
   settings.setMode(mode);
+  trips?.types && trips.render();
   app.layers?.modeChanged();
   switchTab(state.tab === "more" ? "more" : state.tab);
 }
@@ -323,6 +339,7 @@ function buildControls() {
   $("#ab-go").addEventListener("click", findAlternatives);
   $("#custom-go").addEventListener("click", customRoute);
   $("#learned-go").addEventListener("click", learnedRoute);
+  $("#trip-go").addEventListener("click", tripAB);
   $("#loop-go").addEventListener("click", generateLoops);
   $("#heatmap-go").addEventListener("click", () => showHeatmap().catch((e) => setStatus(e.message, true)));
   $("#gps-source").addEventListener("change", async (e) => {
@@ -361,9 +378,11 @@ async function init() {
   rider = new RideController({ api, post, rmap, setStatus, onFinished: onRideFinished,
     onReroute: (route) => { state.routes = [route]; state.selected = route.id; refresh(false); } });
   rider.settingsQuery = () => settings.query();
+  rider.voiceEngine = new Voice();
   plan = new Plan(app);
   Object.assign(app, { settings, plan, rider });
   app.layers = new Layers(app);
+  trips = new TripBuilder(app);
   app.more = new More(app);
   buildControls();
   if (state.mode === "walk" && region.walk_available) setMode("walk"); else { state.mode = "bike"; setMode("bike"); }

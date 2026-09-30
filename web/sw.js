@@ -3,7 +3,7 @@
 const SHELL = "cr-shell-v4", TILES = "cr-tiles-v1", API = "cr-api-v1", LOCAL_TILES = "cr-offline-map-v1";
 const SHELL_FILES = ["/", "/static/style.css", "/static/js/main.js", "/static/js/map.js", "/static/js/cards.js",
   "/static/js/ride.js", "/static/js/rides.js", "/static/js/settings.js", "/static/js/layers.js",
-  "/static/js/plan.js", "/static/js/more.js", "/static/js/util.js", "/static/js/search.js", "/static/js/sources.js", "/static/manifest.json", "/static/icon.svg",
+  "/static/js/plan.js", "/static/js/more.js", "/static/js/util.js", "/static/js/search.js", "/static/js/sources.js", "/static/js/voice.js", "/static/js/trip.js", "/static/manifest.json", "/static/icon.svg",
   "/static/vendor/leaflet/leaflet.js", "/static/vendor/leaflet/leaflet.css", "/static/vendor/protomaps-leaflet.js",
   "/static/vendor/leaflet/images/layers.png", "/static/vendor/leaflet/images/layers-2x.png"];
 const MAX_TILES = 3000;

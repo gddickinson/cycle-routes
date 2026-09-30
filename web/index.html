@@ -89,6 +89,14 @@
         <div class="search"><input id="end-input" placeholder="Search, or tap the map">
           <button id="via-add" class="icon-btn" title="Add a stop on the way">+</button></div>
       </div>
+      <details class="custom" id="ab-trip">
+        <summary>Length &amp; stops</summary>
+        <label class="toggle"><input type="checkbox" id="ab-length-on"> Make it about <b id="ab-length-val">20</b> km</label>
+        <input id="ab-length" type="range" min="3" max="100" step="1" value="20" disabled>
+        <div class="muted small-note">Stops to include (tap again for more):</div>
+        <div class="stop-chips"></div>
+        <button id="trip-go" class="btn secondary">Plan trip with these stops</button>
+      </details>
       <details class="custom">
         <summary>Custom mix</summary>
         <div class="sliders" id="ab-sliders"></div>
@@ -112,6 +120,8 @@
         <label for="loop-profile">Style</label>
         <select id="loop-profile"></select>
       </div>
+      <div class="field"><div class="muted small-note">Stops on the loop (optional - tap again for more):</div>
+        <div class="stop-chips"></div></div>
       <div class="field walk-only" id="tour-field">
         <label for="tour-stops">Sights to visit: <b id="tour-stops-val">6</b></label>
         <input id="tour-stops" type="range" min="2" max="12" step="1" value="6">
@@ -136,6 +146,8 @@
       <div id="layer-toggles" class="layer-toggles"></div>
       <h3>GPS</h3>
       <label class="toggle gps-row">Position from <select id="gps-source"><option value="device">This device</option></select></label>
+      <h3>Voice guidance</h3>
+      <div id="voice-settings"></div>
       <h3>This area</h3>
       <div id="network-score" class="facts">Low-stress network score: …</div>
       <div id="regions"></div>
