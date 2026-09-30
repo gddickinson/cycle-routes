@@ -15,11 +15,29 @@ for **safety** (Level of Traffic Stress), **traffic**, **fun/scenery**, **hills*
   A4 PDF (map, legend, scale, km markers, ratings, elevation profile, cue sheet),
   GPX with elevation and turn cues for Garmin/Wahoo.
 
+## Riding context & planning
+- **Your ride, your conditions**: bike type (road, gravel, MTB, e-bike, cargo, kids), departure
+  time (after dark → lit streets), live wind and heat (Open-Meteo → headwind and shade weighting),
+  current road-work closures (City of Austin WZDx feed) and rider hazard reports all change the route.
+- **Via points** (drag to reshape), **compare all options** side by side, **stops along the way**
+  (water, toilets, bike shops, bike share with live bikes, cafés, sights, places to stay) and the
+  longest stretch without water, **weather warnings**, **multi-day stages** for long rides.
+- **Safer by data**: recorded bike crashes, unsignalised crossings of busy roads, measured traffic
+  volumes and noise are shown on every route and used in the scores. A **Family** route that would
+  be an absurd detour is relaxed and flagged instead.
+- **Community & personal**: press-and-hold the map to report a hazard (pothole, glass, close pass,
+  flooding…), rate a street 👍/👎, or save a place; ★ save routes; 🔗 share links that re-plan;
+  "route like I usually ride" learns from the routes you actually ride.
+- **Print**: overview map (auto or fixed 1:10k/1:25k scale), strip maps for long rides, A6
+  handlebar cue card — each with a QR code to the GPX.
+- **More**: open-data map layers, the area's low-stress network score, build/switch areas.
+- **Offline**: installable app; visited map tiles and planned routes stay available offline.
+
 ## GPS riding & tracking
-- **Ride this route**: turn-by-turn banner (next turn, distance, remaining, off-route warning, one-tap
-  reroute), phone screen kept awake. Uses the phone's own GPS in the browser.
-- **Record a ride** and **My rides**: GPS track saved (SQLite), GPX/CSV export, and the streets you
-  actually rode are rated for safety, fun, traffic and hills.
+- **Ride this route**: turn-by-turn banner with **voice guidance** (next turn, distance, remaining,
+  off-route warning, one-tap reroute), phone screen kept awake, **share live location** link.
+- **Record a ride** and **My rides**: GPS track saved (SQLite), GPX/CSV export, the streets you
+  actually rode are rated, and a heatmap shows how much of the network you have covered.
 - **External GPS**: a USB/serial NMEA receiver (e.g. `hardware/gps_i2c_serial` Arduino sketch):
   `cycleroutes gps` to find/test it, `cycleroutes serve --serial-gps` to offer it in the app.
 - **iPhone tracker (pyNav)**: the Pythonista tracker can post to `http://<mac>:8000/location` unchanged.
@@ -32,21 +50,29 @@ for **safety** (Level of Traffic Stress), **traffic**, **fun/scenery**, **hills*
   dark mode, simulated GPS ride), saves numbered screenshots and PDF page renders, runs ~65 checks
   and writes `screenshots/report.html`. Exit code 1 if any check fails.
 
-## Data sources
-| What | Source |
-|---|---|
-| Streets, paths, bike lanes, speed limits, lanes, surface, lighting | OpenStreetMap via Overpass (osmnx) |
-| Regional/national signed cycle routes (the "cycle map") | OSM `route=bicycle` relations (lcn/rcn/ncn/icn) |
-| Parks, water, woods, viewpoints | OSM features |
-| Elevation | Copernicus GLO-30 DEM (AWS open data) |
-| Basemap | CyclOSM / OpenStreetMap tiles |
-| Place search | Nominatim |
-| Bike shops, water, toilets, repair, parking, bike share | OSM amenities |
+## Data sources (all open; applied where they have coverage)
+| What | Source | Coverage |
+|---|---|---|
+| Streets, paths, bike lanes, speeds, lanes, surface, lighting, signed cycle routes | OpenStreetMap (Overpass) | global |
+| Bike shops, water, toilets, repair, parking | OSM amenities | global |
+| Cafés, food, sights, places to stay | Overture Maps places | global |
+| Elevation | USGS 3DEP bare-earth lidar (US); Copernicus GLO-30 elsewhere | US / global |
+| Tree shade | Meta/WRI 1 m canopy height | global |
+| Road & aviation noise | US DOT National Transportation Noise Map | US |
+| Measured traffic volumes | TxDOT AADT count stations | Texas |
+| Bike crashes, city bike-comfort ratings, bike counters, live road works | City of Austin open data | Austin |
+| Bike share availability | CapMetro GBFS | Austin |
+| Weather | Open-Meteo (free for non-commercial use) | global |
+| Basemap / place search | CyclOSM, OpenStreetMap / Nominatim | global |
+
+Not used (need sign-up or aren't open): Strava (API terms), Mapillary and OpenRouteService (need
+keys), TxDOT DriveTexas (keyed feed), Garmin/Wahoo (approved developer access).
 
 ## Quick start
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/cycleroutes build                     # default: central + north Austin, 6 km radius
+.venv/bin/cycleroutes sources                   # (re)apply extra open data to a built area
 .venv/bin/cycleroutes catalog                   # optional: suggested rides
 .venv/bin/cycleroutes serve                     # http://127.0.0.1:8000
 ```

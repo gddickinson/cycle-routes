@@ -10,6 +10,8 @@ to OSM data (e.g. BikeOttawa's stressmodel):
 
 from cycleroutes.scoring import tags
 
+MPH25, MPH30, MPH40 = 41.0, 51.0, 65.0   # km/h (also covers metric 40 / 50 / 65 limits)
+
 OFF_ROAD = {"cycleway", "path", "track", "bridleway", "footway", "pedestrian"}
 CALM_STREETS = {"residential", "living_street", "service"}
 
@@ -28,18 +30,23 @@ def classify(edge: dict) -> int:
     n_lanes = tags.lanes(edge)
 
     if kind == "lane":
-        if speed <= 50 and n_lanes <= 2:
+        if speed <= MPH30 and n_lanes <= 2:
             return 2
-        if speed <= 65 and n_lanes <= 4:
+        if speed <= MPH40 and n_lanes <= 4:
             return 3
         return 4
 
-    # Mixed traffic
-    if hw == "living_street" or (hw in CALM_STREETS and speed <= 40 and n_lanes <= 2):
+    # Mixed traffic. Speed thresholds are the Furth mph limits with a small margin
+    # (25 mph = 40.2 km/h, 30 mph = 48.3 km/h), so posted US limits land correctly.
+    if hw == "living_street":
         return 1
-    if speed <= 40 and n_lanes <= 2:
+    if hw in CALM_STREETS and n_lanes <= 2:
+        if speed <= MPH25:
+            return 1
+        return 2 if speed <= MPH30 else 3
+    if speed <= MPH25 and n_lanes <= 2:
         return 2
-    if speed <= 50 and n_lanes <= 2 and hw not in ("primary", "trunk"):
+    if speed <= MPH30 and n_lanes <= 2 and hw not in ("primary", "trunk"):
         return 3
     return 4
 

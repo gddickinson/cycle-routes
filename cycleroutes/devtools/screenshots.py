@@ -21,7 +21,7 @@ import requests
 from playwright.sync_api import sync_playwright
 
 from cycleroutes import config
-from cycleroutes.devtools import scenarios, scenarios_ride
+from cycleroutes.devtools import scenarios, scenarios_plan, scenarios_ride
 from cycleroutes.devtools.report import write_report
 from cycleroutes.devtools.session import Shot, ShotSession, write_manifest
 
@@ -105,6 +105,9 @@ def run(out_dir: Path, url: str | None = None, region: str = config.DEFAULT_REGI
                 scenarios.desktop_core(s, base, pts), scenarios.desktop_search(s),
                 scenarios.desktop_loops_and_suggested(s, pts), scenarios.exports(s, base),
                 scenarios_ride.amenities(s, pts)))
+            for name, fn in (("settings", scenarios_plan.settings_and_via), ("layers", scenarios_plan.layers_and_menu),
+                             ("saving", scenarios_plan.favourites_and_links), ("print", scenarios_plan.print_layouts)):
+                _run_group(browser, name, DESKTOP, out_dir, shots, lambda s, fn=fn: fn(s, base, pts))
             _run_group(browser, "phone", PHONE, out_dir, shots,
                        lambda s: scenarios.phone(s, base, pts))
             _run_group(browser, "ride", PHONE | {"permissions": ["geolocation"],

@@ -1,0 +1,7 @@
+.venv
+data_cache
+screenshots
+.git
+**/__pycache__
+*.pdf
+*.gpx

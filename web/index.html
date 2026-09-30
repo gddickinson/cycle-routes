@@ -20,10 +20,12 @@
         <div id="nav-dist" class="nav-dist"></div>
         <div id="nav-instr" class="nav-instr">Waiting for GPS…</div>
       </div>
+      <button id="nav-voice" class="nav-icon" title="Voice guidance on/off" aria-pressed="true">🔊</button>
     </div>
     <div id="nav-meta" class="nav-meta"></div>
     <div class="nav-foot">
       <span id="nav-warn" class="nav-warn"></span>
+      <button id="nav-share" class="btn small secondary" title="Share live location">Share live</button>
       <button id="nav-reroute" class="btn small secondary hidden">Reroute</button>
       <button id="nav-stop" class="btn small danger-solid">Stop</button>
     </div>
@@ -37,26 +39,47 @@
       <nav class="tabs" role="tablist">
         <button class="tab active" data-tab="ab" role="tab">A → B</button>
         <button class="tab" data-tab="loop" role="tab">Loop</button>
-        <button class="tab" data-tab="suggested" role="tab">Suggested</button>
-        <button class="tab" data-tab="rides" role="tab">My rides</button>
+        <button class="tab" data-tab="suggested" role="tab">Ideas</button>
+        <button class="tab" data-tab="rides" role="tab">Rides</button>
+        <button class="tab" data-tab="more" role="tab">More</button>
       </nav>
     </header>
+    <details id="settings" class="settings">
+      <summary><span id="settings-summary">Riding now · hybrid</span></summary>
+      <div class="settings-grid">
+        <label for="bike-type">Bike</label>
+        <select id="bike-type"></select>
+        <label for="depart">Leaving</label>
+        <div class="search"><input id="depart" type="datetime-local">
+          <button id="depart-now" class="icon-btn" title="Leave now">Now</button></div>
+        <span></span>
+        <div class="checks">
+          <label class="toggle"><input type="checkbox" id="use-weather" checked> Weather (wind, heat)</label>
+          <label class="toggle"><input type="checkbox" id="use-closures" checked> Avoid closures</label>
+        </div>
+      </div>
+      <div id="conditions" class="conditions"></div>
+    </details>
     </div>
 
     <section class="tab-body" data-body="ab">
+      <div id="place-chips" class="chips"></div>
       <div class="field">
         <label for="start-input">From</label>
         <div class="search"><input id="start-input" placeholder="Search, or tap the map">
           <button class="icon-btn" data-locate="start" title="Use my location">◎</button></div>
       </div>
+      <div id="via-list" class="via-list"></div>
       <div class="field">
         <label for="end-input">To</label>
-        <div class="search"><input id="end-input" placeholder="Search, or tap the map"></div>
+        <div class="search"><input id="end-input" placeholder="Search, or tap the map">
+          <button id="via-add" class="icon-btn" title="Add a stop on the way">+</button></div>
       </div>
       <details class="custom">
         <summary>Custom mix</summary>
         <div class="sliders" id="ab-sliders"></div>
         <button id="custom-go" class="btn secondary">Route with my mix</button>
+        <button id="learned-go" class="btn secondary">Route like I usually ride</button>
       </details>
       <button id="ab-go" class="btn primary">Find routes</button>
     </section>
@@ -84,16 +107,40 @@
 
     <section class="tab-body hidden" data-body="rides">
       <button id="record-go" class="btn primary">● Record a ride</button>
-      <p class="muted">Records your GPS track, then rates the streets you actually rode.</p>
+      <div class="row-btns">
+        <button id="heatmap-go" class="btn secondary small">Show all my rides</button>
+        <button id="favs-go" class="btn secondary small">Saved routes</button>
+      </div>
+    </section>
+
+    <section class="tab-body hidden" data-body="more">
+      <h3>Map layers</h3>
+      <div id="layer-toggles" class="layer-toggles"></div>
+      <h3>GPS</h3>
+      <label class="toggle gps-row">Position from <select id="gps-source"><option value="device">This device</option></select></label>
+      <h3>This area</h3>
+      <div id="network-score" class="facts">Low-stress network score: …</div>
+      <div id="regions"></div>
+      <details class="custom"><summary>Build a new area</summary>
+        <p class="muted">Downloads and scores the map around the current map centre (takes 5–30 min).</p>
+        <div class="settings-grid">
+          <label for="region-name">Name</label><input id="region-name" placeholder="e.g. bath">
+          <label for="region-radius">Radius</label>
+          <select id="region-radius"><option value="3000">3 km</option><option value="5000" selected>5 km</option>
+            <option value="8000">8 km</option></select>
+        </div>
+        <button id="region-build" class="btn secondary">Build area</button>
+        <div id="region-job" class="facts"></div>
+      </details>
+      <h3>Data sources</h3>
+      <div id="sources" class="facts"></div>
+      <p class="muted">Tip: press and hold (right-click) on the map to report a hazard, rate a street or save a place.</p>
     </section>
 
     <div id="status" class="status" role="status"></div>
     <div id="results" class="results"></div>
 
     <footer class="panel-foot">
-      <label class="toggle"><input type="checkbox" id="stress-toggle"> Show traffic-stress map</label>
-      <label class="toggle"><input type="checkbox" id="amenity-toggle"> Show bike shops, water, toilets, parking</label>
-      <label class="toggle gps-row">GPS: <select id="gps-source"><option value="device">This device</option></select></label>
       <div id="legend" class="legend"></div>
     </footer>
   </aside>

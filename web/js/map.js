@@ -66,6 +66,7 @@ export class RouteMap {
   // Draw all routes faintly and the selected one on top, coloured by stress.
   showRoutes(routes, selectedId, onSelect, maxOthers = 8) {
     this.routeLayer.clearLayers();
+    if (this.stopsLayer) { this.stopsLayer.remove(); this.stopsLayer = null; }
     let selectedBounds = null;
     for (const r of routes.length <= maxOthers ? routes : []) {
       const selected = r.id === selectedId;
@@ -98,6 +99,27 @@ export class RouteMap {
     this.map.fitBounds(bounds, phone
       ? { paddingTopLeft: [20, 20], paddingBottomRight: [20, window.innerHeight * 0.55 + 10] }
       : { paddingTopLeft: [410, 30], paddingBottomRight: [30, 30] });
+  }
+
+  // --- Via points and stops along a route ------------------------------------------
+  setVias(points, onMove) {
+    (this.viaPins || []).forEach((m) => m.remove());
+    this.viaPins = points.map((p, i) => {
+      const icon = L.divIcon({ className: "", iconSize: [22, 22],
+        html: `<div class="pin via-pin">${i + 1}</div>` });
+      const m = L.marker(p, { icon, draggable: true }).addTo(this.map);
+      m.on("dragend", () => { const ll = m.getLatLng(); onMove(i, [ll.lat, ll.lng]); });
+      return m;
+    });
+  }
+
+  showStops(stops) {
+    if (this.stopsLayer) this.stopsLayer.remove();
+    const emoji = { water: "💧", toilets: "🚻", bike: "🔧", bike_share: "🚲", food: "☕", sights: "📷", stay: "🛏" };
+    this.stopsLayer = L.layerGroup(stops.map((s) => L.marker([s.lat, s.lon], {
+      icon: L.divIcon({ className: "", iconSize: [20, 20], html: `<div class="poi poi-small">${emoji[s.group] || "•"}</div>` }),
+    }).bindPopup(`<b>${(s.name || s.label || s.group).replace(/</g, "&lt;")}</b><br>${s.at_km.toFixed(1)} km along · ${s.off_route_m} m off route`)))
+      .addTo(this.map);
   }
 
   // --- Live position, recorded tracks, amenities ------------------------------

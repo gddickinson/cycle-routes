@@ -162,6 +162,27 @@ def ride_csv_export(ride_id: int):
                     headers={"Content-Disposition": f'attachment; filename="ride-{ride_id}.csv"'})
 
 
+@router.get("/api/rides/heatmap")
+def rides_heatmap():
+    """All recorded tracks, plus how much of the street network you have ridden."""
+    s = state()
+    lines, ridden = [], set()
+    for r in s.rides.rides(limit=500):
+        pts = s.rides.points(r["id"])
+        if len(pts) < 2:
+            continue
+        lines.append([[p["lon"], p["lat"]] for p in pts[::2]])
+        matched, _ = match_track(s.router, pts)
+        if matched:
+            ridden |= matched.edge_set()
+    g = s.region.graph
+    ridden_km = sum(min(d["length"] for d in g[u][v].values()) for u, v in ridden if g.has_edge(u, v)) / 1000
+    network_km = sum(d["length"] for _, _, d in g.edges(data=True)) / 2000
+    return {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": lines},
+            "properties": {"rides": len(lines), "ridden_km": round(ridden_km, 1),
+                           "network_km": round(network_km), "coverage_pct": round(100 * ridden_km / max(network_km, 1), 2)}}
+
+
 # Registered after the .gpx/.csv routes so '/api/rides/3.gpx' isn't read as ride id '3.gpx'.
 @router.get("/api/rides/{ride_id}")
 def get_ride(ride_id: int):

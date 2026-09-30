@@ -1,130 +1,131 @@
 # Cycle Routes — Interface Map
 
-Prototype that downloads open data for a region, scores every street for cycling,
-then **automatically generates and rates** routes (A→B alternatives, loop rides,
-and a catalogue of suggested rides). Output: a responsive web app (desktop +
-phone, installable PWA), printable A4 PDF maps, and GPX for bike computers.
+Downloads open data for a region, scores every street for cycling, then **automatically
+generates and rates** routes (A→B alternatives, loops, suggested rides) for the rider's
+context (bike type, time, weather, closures). Outputs: responsive web app / offline-capable
+PWA, printable PDFs (overview, strip maps, cue card), GPX; plus GPS riding & recording.
 
 ## Data flow
 
 ```
-OpenStreetMap (Overpass) ─┐ bike network, tags         cycleroutes/data/
-  signed cycle routes ────┤ route=bicycle relations    (download + enrich)
-  parks/water/viewpoints ─┤                                  │
-Copernicus GLO-30 DEM ────┘ elevation                         ▼
-                                            data_cache/region_<name>.pkl
-                                                              │
-scoring/ (LTS, safety, quiet, surface, fun, time) ◄── used by enrich
-                                                              │
-routing/ router (profiles) · loops · catalog · rating · directions
-                                                              │
-        ┌──────────────────────┬──────────────────────┬───────┴────────┐
-   api/app.py (FastAPI)   export/print_map.py   export/formats.py    cli.py
-        │                      (PDF)               (GPX/GeoJSON)
-   web/ (Leaflet client)
+OpenStreetMap (Overpass): streets, tags, signed routes, parks ─┐
+Copernicus DEM, or USGS 3DEP bare earth (US) ───────────────────┤   data/  (+ data/sources/)
+City of Austin: crashes, bike-comfort, counters ────────────────┤   download, join to edges,
+TxDOT traffic counts · Meta/WRI canopy · US DOT noise ──────────┤   cache in data_cache/
+Overture places · OSM amenities ────────────────────────────────┘          │
+                                                                region_<name>.pkl
+scoring/ (LTS from tags + measured traffic + city comfort; safety incl. crashes;       │
+          quietness incl. traffic/noise; fun incl. shade; crossings) ◄─ enrich/apply   │
+live (api/live.py): work zones (WZDx) · Open-Meteo weather · sun · hazard reports ─► RouteContext
+routing/ router (profiles, via, context, family cap) · loops · catalog · rating · stops · stages
+        │                         │                         │
+   api/ (FastAPI) ───────── export/ (PDF/GPX) ──────── tracking/ (GPS, rides, navigation)
+        │
+   web/ (Leaflet client, service worker)
 ```
 
-## Modules
+## Python modules
 
 ### `cycleroutes/config.py`
-All defaults: paths, `DEFAULT_REGION`, data-source URLs (`OVERPASS_ENDPOINTS`,
-`COPERNICUS_DEM_URL`, `NOMINATIM_URL`), tag lists, speed/scoring constants,
-`LTS_COLORS`/`LTS_LABELS`, loop settings, `Profile` dataclass and `PROFILES`
-(fastest, safest, family, scenic, flattest, quiet, balanced).
+All defaults: paths, `DEFAULT_REGION`, data-source URLs (Overpass, Copernicus, 3DEP, Austin
+Socrata ids, TxDOT, canopy, noise, Overture, GBFS, Open-Meteo), LTS colours, GPS settings,
+`Profile` (+ shade, crossings weights) and `PROFILES` (fastest, safest, family, scenic,
+flattest, quiet, shady, balanced), `CROSSING_COST_M`, `FAMILY_MAX_DETOUR`, `HOT_APPARENT_C`.
+`cycleroutes/__init__.py` pins GDAL/PROJ data to rasterio's bundled copy.
 
-### `cycleroutes/data/` — acquisition & enrichment
+### `cycleroutes/data/`
 | File | Contents |
 |---|---|
-| `overpass.py` | `with_fallback(download)` tries each Overpass endpoint; `post_query()` |
-| `osm_network.py` | `download_bike_network()` (osmnx, simplified MultiDiGraph), `download_scenic_features()` |
-| `amenities.py` | `fetch_amenities()` / `load_amenities()`: bike shops, repair, water, toilets, bike share, parking (GeoJSON cache) |
-| `cycle_networks.py` | `fetch_cycle_route_ways()` → {way id: rank lcn/rcn/ncn/icn, names} |
-| `elevation.py` | `ElevationGrid` (bilinear sample, save/load npz), `fetch_elevation_grid()`, `surface_to_terrain()` (strips buildings/canopy), `climb_along()` |
-| `enrich.py` | `enrich()` = `add_geometry`, `add_scenic_fraction`, `add_elevation` (bridges interpolated), `add_cycle_routes`, `add_scores` |
-| `region.py` | `Region` dataclass, `build_region()` (download+enrich+pickle), `load_region()` |
+| `overpass.py` | `with_fallback(download)` across Overpass mirrors; `post_query()` |
+| `osm_network.py` | `download_bike_network()`, `download_scenic_features()` |
+| `cycle_networks.py` | `fetch_cycle_route_ways()` (lcn/rcn/ncn/icn relations) |
+| `elevation.py` | `ElevationGrid`, `fetch_elevation_grid()` (Copernicus), `surface_to_terrain()`, `climb_along()` |
+| `amenities.py` | `fetch_amenities()` / `load_amenities()` (water, toilets, bike shops, parking, bike share) |
+| `enrich.py` | `enrich()`: geometry, scenic, elevation, cycle routes, `add_scores()` (bearing, LTS, scores), `add_crossings()` |
+| `region.py` | `Region` (+ `sources` report), `build_region()`, `save_region()`, `load_region()` |
 
-### `cycleroutes/scoring/` — per-edge scores (0 bad … 1 good)
+### `cycleroutes/data/sources/` — extra open data (each keyless, applied where it has coverage)
 | File | Contents |
 |---|---|
-| `tags.py` | OSM tag normalisation: `values`, `highway`, `speed_limit_kmh`, `lanes`, `cycleway_kind` |
-| `lts.py` | `classify(edge)` → Level of Traffic Stress 1–4 (Mekuria/Furth, simplified) |
-| `edge_scores.py` | `safety`, `quietness`, `surface`, `fun`, `speed_kmh`, `awkwardness` (parking aisles/driveways), `travel_time_s` |
+| `usgs_3dep.py` | `fetch_3dep_grid()` bare-earth DEM (chunked, parallel, retries), `covers()` |
+| `austin.py` | `fetch_bike_crashes`, `fetch_bike_facilities` (+`COMFORT_TO_LTS`), `fetch_counters`, `fetch_work_zones`, cache helpers |
+| `txdot_aadt.py` | `fetch_stations()` measured traffic (annual + 5-year counts) |
+| `canopy.py` | `fetch_canopy()` → `CanopyGrid.heights()` (Meta/WRI 1 m canopy tiles) |
+| `noise.py` | `fetch_noise()` decodes US DOT noise tiles → `NoiseGrid.sample()` dB |
+| `overture.py` | `fetch_places()` via DuckDB on S3 GeoParquet; `STOP_CATEGORIES`; `load()` |
+| `join.py` | `edges_frame`, `overlap_join`, `nearest_edges`, `propagate_by_name`, `sample_points`, `set_both_directions` |
+| `apply.py` | `apply_all(region, refresh, only)` + per-source `apply_*`; `AADT_CAP_BY_CLASS` sanity caps |
+
+### `cycleroutes/scoring/`
+- `tags.py` — tag normalisation helpers.
+- `lts.py` — `classify()` (OSM, mph-aware thresholds), `with_measured_traffic()`, `effective()` (+ city comfort).
+- `edge_scores.py` — `safety` (crashes), `quietness` (AADT, noise), `surface`, `fun` (shade), `speed_kmh`, `awkwardness`, `travel_time_s`.
 
 ### `cycleroutes/routing/`
 | File | Contents |
 |---|---|
-| `geo.py` | `haversine_m`, `bearing_deg`, `destination`, `NodeIndex.nearest` (ported from pyNav) |
-| `route.py` | `Route` (edges, coords, elevation_profile, length/time), `edges_from_nodes`, `overlap` |
-| `router.py` | `make_cost(profile, penalties)`, `custom_profile`, `Router.route/alternatives/snap`, `RoutingError` |
-| `loops.py` | `generate_loops(router, start, km, profile, count)` — triangle waypoints + reuse penalty |
-| `rating.py` | `rate(route, fastest_time_s)` → stats + 0–10 ratings (safety, fun, traffic, hills, speed, surface, overall) |
-| `directions.py` | `cue_sheet(route)` → `Cue` list (turns, street names, LTS) |
-| `catalog.py` | `build_catalog()` suggested loops from centre + big parks; `load_catalog()` |
+| `geo.py` | haversine, bearing, destination, `NodeIndex` |
+| `route.py` | `Route` (edges, `ctx`, coords, profile, time), `edges_from_nodes`, `overlap` |
+| `context.py` | `RouteContext`, `BIKE_TYPES`, `edge_multiplier`, `travel_time_s` (bike + wind), `headwind_kmh` |
+| `router.py` | `make_cost(profile, penalties, graph, ctx)` (+ crossing penalty), `Router.route(via, ctx)`, `family_route`, `alternatives` |
+| `loops.py` | `generate_loops(..., ctx)` |
+| `rating.py` | `rate()` — ratings incl. shade; crashes, risky crossings, busiest AADT, noise, notice, context |
+| `directions.py` | `cue_sheet()` with service-road jog merging |
+| `catalog.py` | suggested rides from centre + reachable parks |
+| `stops.py` | `along(route, features)`, `longest_dry_stretch()` |
+| `stages.py` | `split_stages(route, km_per_day, stays)` |
+| `network_score.py` | `low_stress_score()` (BNA-style connectivity) |
 
-### `cycleroutes/tracking/` — GPS (ported from gps-tracker + pyNav, Qt-free)
-| File | Contents |
-|---|---|
-| `nmea.py` | `Fix` dataclass, `NmeaParser` (RMC+GGA, checksums, $GN/$GL talkers), `estimate_accuracy_m`, `to_nmea_rmc` |
-| `providers.py` | `SerialGPSProvider` (thread), `IPLocationProvider` (opt-in), `ManualProvider`, `PushProvider`, `discover_serial_gps`, `ProviderManager` |
-| `store.py` | `RideStore` (SQLite rides + points), `drop_spikes`, `track_stats`, `ride_gpx`, `ride_csv` |
-| `navigator.py` | `Navigator.update(fix)` → `Progress` (along/remaining, next cue, off-route debounce, arrival) |
-| `matching.py` | `match_track(router, points)` → matched `Route` + coverage (to rate a ridden track) |
+### `cycleroutes/tracking/` — GPS (from gps-tracker/pyNav)
+`nmea.py` (Fix, NmeaParser), `providers.py` (serial/IP/manual/push, `ProviderManager`), `store.py`
+(`RideStore`, `drop_spikes`, `track_stats`, GPX/CSV), `navigator.py` (`Navigator.update`), `matching.py` (`match_track`).
 
-### `cycleroutes/devtools/` — automated UI testing with screenshots
-| File | Contents |
-|---|---|
-| `session.py` | `ShotSession` (numbered screenshots + checks + auto-captured JS/HTTP errors), `Shot`, `write_manifest` |
-| `scenarios.py` | Desktop/phone/dark walkthroughs, exports (GPX parse, PDF render via pymupdf), `Points`, `frame` |
-| `scenarios_ride.py` | Amenities layer; simulated GPS ride (navigate, off-route, reroute, arrive, save, My rides) |
-| `report.py` | `write_report()` → `report.html` contact sheet |
-| `screenshots.py` | `run()` (starts a temporary server, isolated test ride DB), `print_summary()` |
+### `cycleroutes/community/store.py`
+`CommunityStore`: hazards (`HAZARD_TYPES`, expiry, confirm/resolve), street feedback, places,
+favourites, learned weights (`record_choice`, `learned_weights`), live-share tokens.
 
 ### `cycleroutes/services/`
-- `geocoding.py` — `NominatimGeocoder.search(q, viewbox)` (Qt-free port of pyNav's `NominatimProvider`)
+`geocoding.py` (Nominatim), `weather.py` (Open-Meteo `forecast/at/along_ride/advice`), `sun.py`
+(`sun_times`, `daylight_left`), `bikeshare.py` (GBFS `stations()`).
 
 ### `cycleroutes/export/`
-- `formats.py` — `to_gpx` (track + cue waypoints + elevation), `route_segments_geojson`, `network_geojson`
-- `tiles.py` — `TileManager` (SQLite tile cache, Qt-free port of gps-tracker's), `stitch`, `choose_zoom`
-- `print_map.py` — `route_pdf(route, stats, title, basemap)` A4: map page + ratings/elevation/cue pages
+`formats.py` (GPX/GeoJSON), `tiles.py` (TileManager), `print_map.py` (`route_pdf(layout, scale, qr_url)`,
+map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 
 ### `cycleroutes/api/`
-- `state.py` — `AppState` (region, router, stored routes, navigators, `RideStore`, `ProviderManager`), `state()`, `set_state()`, `latlon()`
-- `app.py` — FastAPI: `/api/region`, `/api/network`, `/api/amenities`, `/api/alternatives`, `/api/route`,
-  `/api/loop`, `/api/suggested`, `/api/geocode`, `/api/export/{id}.gpx|.pdf`; serves `web/`
-- `tracking_api.py` — `/api/gps/sources|scan|live`, `/api/rides` (start, points, finish, list, get, .gpx, .csv, delete),
-  `/api/navigate/{route_id}`, and `POST /location` (pyNav/Pythonista iPhone tracker format); `fix_from_dict()`
-- `serialize.py` — `route_payload()` (geojson segments, cues, downsampled elevation)
+| File | Contents |
+|---|---|
+| `state.py` | `AppState` (region, router, routes, navigators, rides, community, live, gps) |
+| `live.py` | `LiveData`: work zones → closed/restricted edges, report multipliers, `context()` |
+| `app.py` | region, network, alternatives/route/loop (via, bike, depart, weather, closures, learned), suggested, amenities, geocode, exports (PDF layouts), `/sw.js` |
+| `planning_api.py` | conditions, weather/{rid}, stops/{rid}, stages/{rid}, layers/{name}, network/score, regions (list/build/job/activate) |
+| `community_api.py` | hazards, feedback, places, favourites, learned profile, ride share + `/share/{token}` page |
+| `tracking_api.py` | GPS sources/live, `/location` (iPhone tracker), rides (+ heatmap), navigate |
+| `serialize.py` | `route_payload()` |
+
+### `cycleroutes/devtools/` — `cycleroutes screenshots`
+`session.py` (ShotSession), `scenarios.py`, `scenarios_plan.py`, `scenarios_ride.py`, `report.py`, `screenshots.py`.
 
 ### `cycleroutes/cli.py`
-`cycleroutes build | route | loop | catalog | amenities | gps | screenshots | serve [--https --serial-gps --ip-location]`.
+`build | sources | catalog | amenities | route | loop | gps | screenshots | serve [--https --serial-gps --ip-location]`.
 
-### `web/` (static client, no build step)
-- `index.html`, `style.css` (desktop side panel → phone bottom sheet, dark mode), `manifest.json`, `icon.svg`
-- `js/map.js` — `RouteMap` (Leaflet, CyclOSM/OSM layers, stress layer, route drawing, pins)
-- `js/cards.js` — `renderCards`, `elevationSvg` (ratings, stress mix, cues, export links)
-- `js/main.js` — tabs, search, map clicks, API calls, rides tab wiring
-- `js/ride.js` — `RideController` (device GPS or server GPS feed, recording, navigation banner, reroute, wake lock)
-- `js/rides.js` — `renderRides`, `summaryHtml` (My rides list)
+## Web client (`web/`, no build step)
+| File | Contents |
+|---|---|
+| `index.html`, `style.css`, `manifest.json`, `icon.svg`, `share.html`, `sw.js` | page, styles, PWA, live-share viewer, offline service worker |
+| `js/main.js` | app wiring: tabs, points, planning requests, results, rides |
+| `js/util.js` | `$`, `api/post/del`, `esc`, `remember/recall`, `copyText` |
+| `js/settings.js` | `Settings` (bike, depart, weather, closures, conditions), `planLink`, `readLink` |
+| `js/map.js` | `RouteMap`: layers, pins, via pins, stops, position, tracks, amenities |
+| `js/layers.js` | `Layers`: open-data layers + press-and-hold menu (hazard, feedback, places) |
+| `js/plan.js` | `Plan`: via points, places, favourites, stops/weather details, stages, compare |
+| `js/cards.js` | `renderCards` (ratings, open-data facts, print menu, save/link) |
+| `js/ride.js` | `RideController`: GPS feed, navigation banner, voice, reroute, live share |
+| `js/rides.js`, `js/search.js`, `js/more.js` | rides list, place search, More tab (score, sources, regions) |
 
-### `tests/` (offline, synthetic 6×6 street grid in `conftest.py`)
-`test_scoring.py`, `test_routing.py`, `test_api.py`, `test_tracking.py` (NMEA, navigator, store, serial via pty).
+## Tests (`tests/`, offline)
+`test_scoring`, `test_routing`, `test_api`, `test_tracking`, `test_sources`, `test_planning`
+(synthetic 6×6 grid in `conftest.py`; weather stubbed).
 
-### `hardware/gps_i2c_serial/`
-Arduino sketch (from gps-tracker) that reads an Adafruit I2C GPS and emits NMEA over USB at 115200 baud —
-the input `SerialGPSProvider` expects.
-
-### `scripts/`
-- `build_demo.py` — build the default region with verbose logging.
-
-## Reuse from sibling projects
-- pyNav `NominatimProvider` → `services/geocoding.py`; distance/bearing maths → `routing/geo.py`;
-  GPX/GeoJSON export → `export/formats.py` (extended with elevation + cues).
-- gps-tracker `TileManager`/`TILE_SERVERS` (incl. CyclOSM) → `export/tiles.py`.
-- gps-tracker `SerialGPSProvider`/`IPLocationProvider`/device discovery + pyNav `GPSProvider` accuracy
-  heuristic → `tracking/nmea.py`, `tracking/providers.py`; gps-tracker CSV logging → `tracking/store.py`.
-- pyNav `RoutingEngine.update_location` → `tracking/navigator.py` (projection onto the route, off-route).
-- pyNav `iphoneTracking/macbook_server.py` → `POST /location` in `api/tracking_api.py` (same JSON).
-- pyNav `search_nearby_pois` → `data/amenities.py`.
-- Not reused: PyQt widgets/threads (web client instead); pyNav's OSRM/GraphHopper clients (can't take our
-  scores); pyNav offline MBTiles/vector tile rendering (future: PWA offline tiles); the iPhone sensor
-  test apps (motion sensors aren't needed for cycling routes).
+## Other
+`hardware/gps_i2c_serial/` Arduino NMEA sketch · `Dockerfile` · `scripts/build_demo.py`.

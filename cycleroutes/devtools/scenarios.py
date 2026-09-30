@@ -80,7 +80,12 @@ def desktop_core(sess: ShotSession, url: str, pts: Points) -> None:
     card = sess.page.locator(".card.selected")
     sess.check("Elevation profile drawn", card.locator("svg.elev").count() == 1)
     sess.check("Directions listed", card.locator(".cues li").count() >= 2)
-    sess.check("PDF and GPX links present", card.locator("a[href$='.pdf'], a[href$='.gpx']").count() == 2)
+    sess.check("Print menu and GPX link present",
+               card.locator(".print-select").count() == 1 and card.locator("a[href$='.gpx']").count() == 1)
+    sess.page.wait_for_function("() => !document.querySelector('.card.selected .extra')?.textContent.includes('Loading')",
+                                timeout=30000)
+    extra = card.locator(".extra").inner_text()
+    sess.check("Stops along the route listed", "Along the way" in extra, extra[:120])
     ratings = [float(t) for t in card.locator(".ratings b").all_inner_texts()]
     sess.check("Ratings within 0-10", all(0 <= r <= 10 for r in ratings), str(ratings))
     sess.shot("ab_card_detail", "Selected card close-up: ratings, stress mix, elevation, exports, directions.",
@@ -138,12 +143,13 @@ def desktop_loops_and_suggested(sess: ShotSession, pts: Points) -> None:
     sess.check("Suggested rides sorted best first", scores == sorted(scores, reverse=True))
     sess.shot("suggested", f"{n} pre-generated rides, best rated first; only the selected one is drawn.")
 
-    sess.page.check("#stress-toggle")
+    sess.page.click("[data-tab=more]")
+    sess.page.check("[data-layer=stress]")
     sess.page.wait_for_timeout(2500)
     sess.check("Stress layer drawn", sess.page.evaluate(
         "document.querySelectorAll('.leaflet-overlay-pane canvas').length") >= 1)
     sess.shot("stress_layer", "Traffic-stress layer: every street coloured by Level of Traffic Stress.")
-    sess.page.uncheck("#stress-toggle")
+    sess.page.uncheck("[data-layer=stress]")
 
     sess.page.hover(".leaflet-control-layers")
     sess.page.locator(".leaflet-control-layers-base label", has_text="OpenStreetMap").click()
@@ -154,6 +160,9 @@ def desktop_loops_and_suggested(sess: ShotSession, pts: Points) -> None:
 
 
 def exports(sess: ShotSession, url: str) -> None:
+    if _selected_id(sess) is None:            # e.g. after visiting the More tab
+        sess.page.click("[data-tab=suggested]")
+        sess.wait_for_results()
     rid = _selected_id(sess)
     if not sess.check("A route is selected for export", rid is not None):
         return

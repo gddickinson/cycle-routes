@@ -12,7 +12,8 @@ from cycleroutes.routing.geo import destination, haversine_m
 
 def amenities(sess: ShotSession, pts: Points) -> None:
     frame(sess, [pts.a, pts.b])
-    sess.page.check("#amenity-toggle")
+    sess.page.click("[data-tab=more]")
+    sess.page.check("[data-layer=amenities]")
     sess.page.wait_for_timeout(1500)
     n = sess.page.locator(".poi").count()
     sess.check("Amenity markers shown", n >= 5, f"{n} markers in view")
@@ -33,7 +34,7 @@ def amenities(sess: ShotSession, pts: Points) -> None:
     sess.check("Zoomed in: bike parking layer active", n_park >= 1, f"{n_park} racks in view")
     sess.shot("amenities_zoomed", "Zoomed to street level: bike parking racks appear too.")
     sess.page.keyboard.press("Escape")
-    sess.page.uncheck("#amenity-toggle")
+    sess.page.uncheck("[data-layer=amenities]")
 
 
 def _route_coords(sess: ShotSession) -> list[tuple[float, float]]:
@@ -67,7 +68,7 @@ def ride(sess: ShotSession, url: str, pts: Points) -> None:
     sess.click_map(*pts.b)
     sess.wait_for_results()
     coords = _route_coords(sess)
-    sess.page.locator(".card.selected [data-ride-route]").click()
+    sess.page.locator(".card.selected [data-act=ride]").click()
     sess.page.wait_for_selector("#nav:not(.hidden)")
 
     for f in (0.05, 0.15, 0.3, 0.4):

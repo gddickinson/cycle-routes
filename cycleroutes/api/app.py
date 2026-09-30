@@ -155,6 +155,13 @@ def export_pdf(rid: str, request: Request, basemap: str = "CyclOSM", layout: str
                     headers={"Content-Disposition": f'inline; filename="route-{rid}-{layout}.pdf"'})
 
 
+@app.get("/sw.js")
+def service_worker():
+    """Served from the root so the offline cache covers the whole app."""
+    return FileResponse(config.WEB_DIR / "sw.js", media_type="text/javascript",
+                        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
+
+
 @app.get("/")
 def index():
     return FileResponse(config.WEB_DIR / "index.html")

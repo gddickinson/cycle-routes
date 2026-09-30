@@ -63,3 +63,22 @@ traffic, surface) from open data; usable on desktop and phone, and printable.
   cyclist amenities (698 in Austin); Arduino GPS sketch; `serve --https` for phone GPS over Wi-Fi.
 - Tests: 27 passing (NMEA, navigator, store, spike filter, serial GPS via pty, ride/iPhone API flow).
 - Not verified: a real USB GPS receiver and a real phone outdoors (simulated only).
+
+## 2026-09-30 — "Implement all ideas, use all open data"
+**Data added (Austin):** USGS 3DEP bare earth (5 m), 772 bike crashes (Vision Zero), city bike-comfort
+on 10.3k segments, TxDOT traffic counts on 7.8k segments (freeway→frontage mis-snaps rejected),
+Meta/WRI canopy shade, US DOT noise, 29 bike counters, live WZDx work zones (≈380 closed segments),
+3.4k Overture places, CapMetro GBFS, Open-Meteo weather, sunrise/sunset.
+**Features:** bike types, departure time/darkness, wind/heat, closures, via points, crossing
+penalties, family detour cap, Shadiest profile, stops along route, water gaps, stages, compare,
+hazard reports, street feedback, places, favourites, learned profile, share links, live location
+share, voice guidance, ride heatmap/coverage, open-data layers, network score, region build/switch,
+strip maps, A6 cue card, QR codes, fixed-scale printing, offline service worker, Dockerfile.
+**Bugs found & fixed on the way:** mph thresholds (25 mph residential was LTS 2–3), source report
+overwritten by `--only` runs, AADT on frontage roads, crossing flags along bike lanes, settings
+panel overflow, café marker clutter, closure colour clashing with LTS 4 red, PROJ from another
+conda env breaking rasterio.
+**Not done:** Garmin/Wahoo sync, Mapillary, OpenRouteService, TxDOT keyed feed, Strava (keys/terms),
+native background-GPS wrapper, bike+transit routing, BikeMaps (no Austin data), larger-area routing
+engine (GraphHopper). Docker image written but not built (daemon not running).
+**Tests:** 44 unit/API tests; screenshot suite 40 screenshots / 86 checks, all passing.

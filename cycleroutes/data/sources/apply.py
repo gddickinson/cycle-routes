@@ -18,6 +18,11 @@ from cycleroutes.data.sources import austin, canopy, join, noise, overture, txdo
 
 logger = logging.getLogger(__name__)
 
+# Highest plausible daily traffic per street class; a count above this means the
+# station belongs to a nearby bigger road (usually a freeway beside its frontage road).
+AADT_CAP_BY_CLASS = {"living_street": 3000, "residential": 8000, "service": 8000, "unclassified": 15000,
+                     "tertiary": 30000, "secondary": 50000, "primary": 90000, "road": 30000}
+
 
 def _cached_json(path, fetch, refresh: bool):
     if path.exists() and not refresh:
@@ -71,13 +76,20 @@ def apply_crashes(region, edges, refresh=False) -> str:
 def apply_aadt(region, edges, refresh=False) -> str:
     if not txdot_aadt.covers(*region.bbox):
         return "skipped (outside Texas)"
+    for _, _, d in region.graph.edges(data=True):
+        d.pop("aadt", None)
     stations = _cached_json(config.DATA_DIR / f"aadt_{region.name}.json",
                             lambda: txdot_aadt.fetch_stations(region.bbox), refresh)
     seeds: dict[int, int] = {}
-    for idx, s in join.nearest_edges(edges, stations, 40.0, roads_only=True):
+    rejected = 0
+    for idx, s in join.nearest_edges(edges, stations, 30.0, roads_only=True):
+        cap = AADT_CAP_BY_CLASS.get(edges.at[idx, "hw"], 60000)
+        if s["aadt"] > cap:      # e.g. an I-35/MoPac mainline station snapped to its frontage road
+            rejected += 1
+            continue
         seeds[idx] = max(seeds.get(idx, 0), s["aadt"])
     n = join.propagate_by_name(region.graph, edges, seeds, "aadt")
-    return f"{len(stations)} count stations -> measured volume on {n} segments"
+    return f"{len(stations)} count stations -> measured volume on {n} segments ({rejected} implausible snaps skipped)"
 
 
 def _to_lonlat(edges):
@@ -145,5 +157,5 @@ def apply_all(region: Region, refresh: bool = False, only: set[str] | None = Non
             report[name] = f"FAILED: {type(exc).__name__}: {exc}"
         logger.info("%s: %s", name, report[name])
     enrich.add_scores(region.graph)   # also re-flags risky crossings
-    region.sources = report
+    region.sources = {**getattr(region, "sources", {}), **report}   # --only runs add to the record
     return report

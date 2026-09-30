@@ -1,6 +1,6 @@
 // Live riding: GPS feed (this device or a GPS on the server), recording, turn-by-turn.
 
-const $ = (sel) => document.querySelector(sel);
+import { $, copyText, recall, remember } from "./util.js";
 const FLUSH_MS = 5000;
 const POLL_MS = 1000;
 
@@ -24,8 +24,18 @@ export class RideController {
     Object.assign(this, { api, post, rmap, setStatus, onFinished, onReroute });
     this.source = "device";
     this.active = false;
+    this.voice = recall("voice", true);
+    this.spoken = new Set();
     $("#nav-stop").addEventListener("click", () => this.stop());
     $("#nav-reroute").addEventListener("click", () => this.reroute());
+    $("#nav-share").addEventListener("click", () => this.shareLive());
+    $("#nav-voice").addEventListener("click", () => {
+      this.voice = !this.voice;
+      remember("voice", this.voice);
+      this.renderVoice();
+      if (this.voice) this.say("Voice guidance on");
+    });
+    this.renderVoice();
   }
 
   // --- lifecycle ---------------------------------------------------------------
@@ -37,7 +47,9 @@ export class RideController {
     Object.assign(this, { active: true, rideId: ride.id, route, buffer: [], lastFix: null,
       points: 0, startedAt: Date.now(), restart: true });
     this.showBanner();
+    this.spoken = new Set();
     this.renderIdle(route ? "Waiting for GPS…" : "Recording — waiting for GPS…");
+    if (route) this.say(`Starting ${route.title}. ${route.cues?.[0]?.instruction || ""}`);
     this.flushTimer = setInterval(() => this.flush(), FLUSH_MS);
     this.startFeed();
     this.keepAwake();
@@ -98,7 +110,7 @@ export class RideController {
     const body = { ...fix, restart: this.restart };
     this.restart = false;
     const nav = await this.post(`/api/navigate/${this.route.id}`, body).catch(() => null);
-    if (nav) this.renderNav(nav, fix);
+    if (nav) { this.renderNav(nav, fix); this.announce(nav); }
   }
 
   async flush() {
@@ -111,10 +123,11 @@ export class RideController {
     if (!this.route || !this.lastFix) return;
     const coords = this.route.geojson.features.at(-1).geometry.coordinates.at(-1);
     const profile = this.route.profile in { custom: 1, ridden: 1 } ? "balanced" : this.route.profile;
+    const extra = this.settingsQuery ? `&${this.settingsQuery()}` : "";
     $("#nav-warn").textContent = "Finding a new route…";
     try {
       const r = await this.api(`/api/route?start=${this.lastFix.latitude},${this.lastFix.longitude}` +
-        `&end=${coords[1]},${coords[0]}&profile=${profile}`);
+        `&end=${coords[1]},${coords[0]}&profile=${profile}${extra}`);
       this.route = { ...r, title: `${r.title} (rerouted)` };
       this.restart = true;
       this.onReroute(this.route);
@@ -126,6 +139,52 @@ export class RideController {
 
   async keepAwake() {
     try { this.wakeLock = await navigator.wakeLock?.request("screen"); } catch { /* optional */ }
+  }
+
+  // --- voice & sharing -------------------------------------------------------------
+  renderVoice() {
+    $("#nav-voice").textContent = this.voice ? "🔊" : "🔇";
+    $("#nav-voice").setAttribute("aria-pressed", String(this.voice));
+  }
+
+  say(text) {
+    if (!this.voice || !("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    } catch { /* speech unavailable */ }
+  }
+
+  /** Speak each cue once at ~200 m and again at ~40 m; announce off-route and arrival once. */
+  announce(nav) {
+    const cue = nav.next_cue;
+    if (nav.arrived && !this.spoken.has("arrived")) { this.spoken.add("arrived"); this.say("You have arrived"); return; }
+    if (nav.off_route && !this.spoken.has(`off-${this.route?.id}`)) {
+      this.spoken.add(`off-${this.route?.id}`);
+      this.say("You are off the route. Tap reroute, or head back to the line.");
+      return;
+    }
+    if (!cue || nav.distance_to_cue_m == null) return;
+    const key = `${this.route?.id}-${cue.at_km}`;
+    const d = nav.distance_to_cue_m;
+    if (d <= 45 && !this.spoken.has(`${key}-now`)) {
+      this.spoken.add(`${key}-now`);
+      this.say(cue.instruction);
+    } else if (d <= 220 && d > 60 && !this.spoken.has(`${key}-soon`)) {
+      this.spoken.add(`${key}-soon`);
+      this.say(`In ${Math.round(d / 50) * 50} metres, ${cue.instruction}`);
+    }
+  }
+
+  async shareLive() {
+    if (this.rideId == null) return;
+    try {
+      const res = await this.post(`/api/rides/${this.rideId}/share`, {});
+      const url = `${location.origin}${res.path}`;
+      const copied = await copyText(url);
+      $("#nav-warn").textContent = copied ? "Live link copied - valid 6 h" : url;
+      if (navigator.share) navigator.share({ title: "Follow my ride", url }).catch(() => {});
+    } catch (err) { $("#nav-warn").textContent = err.message; }
   }
 
   // --- banner ------------------------------------------------------------------
@@ -167,6 +226,7 @@ export class RideController {
     $("#nav-warn").textContent = nav.off_route ? "Off route" :
       (fix.accuracy_m > 60 ? `Weak GPS (±${Math.round(fix.accuracy_m)} m)` : "");
     $("#nav-reroute").classList.toggle("hidden", !nav.off_route);
+    if (!nav.off_route) this.spoken.delete(`off-${this.route?.id}`);
     $("#nav-stop").textContent = nav.arrived ? "Finish ride" : "Stop";
   }
 }

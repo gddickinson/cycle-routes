@@ -133,3 +133,64 @@ details.custom summary { cursor: pointer; color: var(--muted); font-size: 14px; 
   .nav-dist { font-size: 23px; }
   body.navigating .leaflet-top.leaflet-right { top: 150px; }
 }
+
+/* --- Ride settings & conditions --- */
+.settings { margin: 8px 0 0; font-size: 13px; }
+.settings summary { cursor: pointer; color: var(--muted); padding: 4px 2px; list-style-position: inside; }
+.settings-grid { display: grid; grid-template-columns: 70px 1fr; gap: 6px 8px; align-items: center; margin: 6px 0; }
+.settings-grid select, .settings-grid input { padding: 6px 8px; font-size: 13px; }
+.checks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.conditions { font-size: 12.5px; color: var(--muted); line-height: 1.5; padding: 4px 0 6px; }
+.tab { font-size: 13.5px; padding: 8px 2px; }
+
+/* --- Planning extras --- */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip { display: inline-flex; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; font-size: 13px; }
+.chip button { border: 0; background: var(--surface); color: var(--text); padding: 4px 8px; cursor: pointer; font: inherit; }
+.chip button + button { color: var(--muted); padding: 4px 6px; }
+.via-list { margin: -4px 0 8px; }
+.via-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+.via-row small { color: var(--muted); flex: 1; }
+.via-row .icon-btn { width: 28px; height: 26px; font-size: 13px; }
+.via-num, .via-pin { background: #6f42c1; color: #fff; border-radius: 50%; width: 20px; height: 20px;
+  display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; }
+.via-pin { width: 22px; height: 22px; border: 2px solid #fff; }
+.icon-btn.active { background: var(--accent); color: var(--accent-ink); }
+.notice { background: #fff4d6; color: #5c4300; border-radius: 8px; padding: 6px 8px; font-size: 12.5px; margin: 6px 0; }
+.advice { background: #ffe9e0; color: #6b2400; border-radius: 8px; padding: 6px 8px; font-size: 12.5px; margin: 6px 0; }
+@media (prefers-color-scheme: dark) {
+  .notice { background: #3b3113; color: #ffe19a; } .advice { background: #3d2218; color: #ffc4ad; }
+}
+.ctx { font-style: italic; }
+.extra { margin-top: 6px; }
+.print-select { width: auto; flex: none; padding: 6px 8px; font-size: 13px; border-radius: 8px; }
+.row-btns { display: flex; gap: 6px; margin-top: 8px; }
+.compare { overflow-x: auto; margin: 6px 0 10px; }
+.compare table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+.compare th, .compare td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.compare thead th { font-weight: 650; text-align: right; }
+.compare tbody th { text-align: left; font-weight: 500; color: var(--muted); }
+#compare-go { margin-bottom: 8px; }
+
+/* --- More tab, layers, popups --- */
+.tab-body h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 6px; }
+.tab-body h3:first-child { margin-top: 2px; }
+.layer-toggles .toggle { padding: 3px 0; font-size: 13.5px; }
+.ctx-menu { font-size: 13px; }
+.ctx-menu details { margin-top: 6px; }
+.ctx-menu select, .ctx-menu input { width: 100%; margin: 4px 0; padding: 5px; font-size: 13px; }
+.popup-btns { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.popup-btns button, .ctx-menu details button { border: 1px solid #ccd; background: #f5f6f4; border-radius: 6px;
+  padding: 4px 8px; font: inherit; font-size: 12.5px; cursor: pointer; color: #1d2320; }
+.poi-count { width: auto; min-width: 24px; padding: 0 4px; border-radius: 12px; background: #1f6feb; color: #fff;
+  font-size: 10.5px; font-weight: 700; }
+.poi-hazard { background: #ffd23f; }
+.poi-empty { opacity: .45; }
+.poi-small { width: 20px; height: 20px; font-size: 11px; }
+.poi sub { font-size: 9px; font-weight: 700; }
+.nav-icon { background: none; border: 0; font-size: 24px; cursor: pointer; margin-left: auto; color: #fff; }
+
+.settings { padding: 0 16px; }
+.settings-grid > * { min-width: 0; }
+.settings .search input { min-width: 0; }
+.settings summary { padding-left: 0; }
