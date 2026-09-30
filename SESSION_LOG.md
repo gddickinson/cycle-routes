@@ -117,3 +117,12 @@ engine (GraphHopper). Docker image written but not built (daemon not running).
   scenic matching 25 min → ~2 min (spatial index, identical results). A* tried and reverted
   (identical routes, no speed-up).
 - Tests: 69 unit/API; screenshot suite 50 screenshots / 107 checks, all passing.
+
+## 2026-09-30 — Get there / extend any route
+- 🧭 on every route card: start from location / tapped point / saved place; join at start or nearest
+  point (loops rotate); finish, return to start (loop) or continue to a destination via stops.
+  Approach/onward legs drawn dashed; one rated route. Saved routes store an exact snapshot
+  (edges + parts) and reopen as saved.
+- Fixes: taps while choosing a point were swallowed by route lines/markers (now pass through);
+  suggested titles showed the target distance, not the actual one; saved snapshots lost the parts.
+- Tests 74; screenshot suite 53 screenshots / 113 checks, all passing.

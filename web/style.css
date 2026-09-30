@@ -223,3 +223,14 @@ body:not([data-mode="walk"]) .walk-only { display: none !important; }
   .panel-head .head-row h1 { display: none; }
   .panel-head .head-row { justify-content: center; margin: 2px 0 8px; }
 }
+.extend { border: 1px dashed var(--line); border-radius: 8px; padding: 8px; margin: 8px 0; font-size: 13px; }
+.ext-row { margin-bottom: 8px; }
+.ext-row select { width: 100%; margin-top: 4px; font-size: 13px; padding: 5px; }
+.ext-stops { margin: 4px 0; padding-left: 20px; font-size: 12.5px; }
+.legs .leg { white-space: nowrap; }
+.leg-approach, .leg-onward { font-style: italic; }
+body.picking #map { cursor: crosshair; }
+/* while choosing a point, taps go to the map, not to routes or markers under the finger */
+body.picking .leaflet-marker-pane, body.picking .leaflet-overlay-pane,
+body.picking .leaflet-tooltip-pane, body.picking .leaflet-popup-pane { pointer-events: none; }
+body.picking .leaflet-marker-pane *, body.picking .leaflet-overlay-pane * { pointer-events: none !important; }

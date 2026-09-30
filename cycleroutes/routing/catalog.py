@@ -64,7 +64,8 @@ def build_catalog(region: Region, router: Router, distances=None, profiles=None)
                     continue
                 label = config.MODES[router.mode][profile].label
                 rides.append({
-                    "title": f"{hub['name']}: {km} km {label.lower()} {'walk' if walk else 'loop'}",
+                    # the actual distance - loops can't always hit the target exactly
+                    "title": f"{hub['name']}: {stats['distance_km']:.0f} km {label.lower()} {'walk' if walk else 'loop'}",
                     "hub": hub["name"], "profile": profile, "target_km": km,
                     "edges": [list(e) for e in loop.edges], "stats": stats,
                 })

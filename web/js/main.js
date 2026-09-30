@@ -40,7 +40,12 @@ function refresh(fit = false) {
   renderCards($("#results"), state.routes, state.selected, region.lts_colors, {
     onSelect: select, onRide: rideRoute, onDetails: (r) => plan.loadDetails(r),
     onSave: (r) => plan.saveFavourite(r).catch((e) => setStatus(e.message, true)),
+    onExtend: (r) => plan.toggleExtend(r),
     onLink: async (r) => {
+      if (!r.request?.start && !r.request?.loop) {
+        setStatus("Links re-plan from start and end points, which this route doesn't have - use ★ Save to keep it.", true);
+        return;
+      }
       const url = planLink(r.request || {});
       setStatus(await copyText(url) ? "Link copied - it re-plans this route when opened." : url);
     },
@@ -98,6 +103,12 @@ function setPoint(which, latlon, label) {
 
 function onMapClick(latlon) {
   if (!rmap.inRegion(latlon)) { setStatus(OUTSIDE_MSG, true); return; }
+  if (state.picking) {                    // another feature asked for a point on the map
+    const done = state.picking;
+    state.picking = null;
+    document.body.classList.remove("picking");
+    return done(latlon);
+  }
   if (state.tab === "loop") return setPoint("loop", latlon);
   if (state.tab !== "ab") return;
   if (plan.addingVia) return plan.addVia(latlon);
@@ -110,6 +121,19 @@ function onMapClick(latlon) {
     findAlternatives();
   }
 }
+
+app.pickOnMap = (prompt) => new Promise((resolve) => {
+  setStatus(prompt);
+  document.body.classList.add("picking");
+  if (window.innerWidth <= 700) $("#panel").classList.add("collapsed");
+  state.picking = (ll) => { setStatus(""); $("#panel").classList.remove("collapsed"); resolve(ll); };
+});
+app.addRoute = (route) => {                // a new route derived from another (e.g. extended)
+  state.routes = [route, ...state.routes.filter((r) => r.id !== route.id)];
+  state.selected = route.id;
+  refresh(true);
+};
+app.settingsQuery = () => settings.query();
 
 app.pointFromMenu = (which, ll, label) => {
   if (state.tab !== "ab") switchTab("ab");

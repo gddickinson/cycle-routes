@@ -3,7 +3,7 @@
 Run:  uvicorn cycleroutes.api.app:app --reload     (region from $CYCLEROUTES_REGION)
 """
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +18,7 @@ from cycleroutes.api.sources_api import router as sources_router
 from cycleroutes.api.tracking_api import router as tracking_router
 from cycleroutes.export.formats import to_gpx
 from cycleroutes.export.print_map import route_pdf
+from cycleroutes.routing.combine import extend_route
 from cycleroutes.routing.loops import generate_loops
 from cycleroutes.routing.tours import generate_tour
 from cycleroutes.routing.rating import rate
@@ -150,6 +151,29 @@ def loop(start: str, km: float = Query(15, ge=2, le=100), profile: str = "scenic
 @app.get("/api/amenities")
 def amenities():
     return state().amenities
+
+
+@app.post("/api/extend/{rid}")
+def extend(rid: str, body: dict = Body(...), bike: str = "hybrid", depart: str | None = None,
+           weather: bool = True, closures: bool = True, avoid: str | None = None, infra_only: bool = False,
+           data: str = "all", reports: bool = True):
+    """Get to a route from a point, turn it into a loop, add stops and a final destination."""
+    s = state()
+    base, _, title = s.get(rid)
+    mode = base.graph.graph.get("mode", "bike")
+    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only, data, reports, mode)
+    pt = lambda v: tuple(float(x) for x in v) if v else None     # noqa: E731
+    profile = body.get("profile") or base.profile
+    if profile not in config.MODES[mode]:
+        profile = "balanced"
+    r = extend_route(s.router_for(mode), base, start=pt(body.get("start")), join=body.get("join", "start"),
+                     after=body.get("after", "end"), stops=[pt(p) for p in body.get("stops", [])],
+                     destination=pt(body.get("destination")), profile=profile, ctx=ctx)
+    base_title = title or base.meta.get("title") or r.profile
+    extra = [x for x in ("from your start" if body.get("start") else "",
+                         "back to start" if body.get("after") == "return" else "",
+                         "to your destination" if body.get("after") == "destination" else "") if x]
+    return _store(r, rate(r), info, f"{base_title} ({', '.join(extra)})" if extra else base_title)
 
 
 @app.get("/api/suggested")

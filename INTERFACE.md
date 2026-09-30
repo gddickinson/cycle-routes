@@ -87,6 +87,7 @@ flattest, quiet, trails, mtb, shady, balanced), `TRAIL_FILTERS` (extra OSM ways:
 | `rating.py` | `rate()` — ratings incl. shade; trail %, MTB grade, avoided km, crashes, crossings, busiest AADT, noise |
 | `directions.py` | `cue_sheet()` with service-road jog merging |
 | `catalog.py` | suggested rides from centre + reachable parks |
+| `combine.py` | `extend_route()` (approach → route joined at start/nearest → stops → end/return/destination, with leg bounds), `route_from_edges()` (saved snapshots) |
 | `stops.py` | `along(route, features)`, `longest_dry_stretch()` |
 | `stages.py` | `split_stages(route, km_per_day, stays)` |
 | `network_score.py` | `low_stress_score()` (BNA-style connectivity) |
@@ -117,16 +118,16 @@ map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 |---|---|
 | `state.py` | `AppState` (region, router, routes, navigators, rides, community, live, gps) |
 | `live.py` | `LiveData`: work zones → closed/restricted edges, report multipliers, `context()` |
-| `app.py` | region, network, alternatives/route/loop (via, bike, depart, weather, closures, avoid, infra_only, learned), suggested, amenities, geocode, exports, `/sw.js` |
+| `app.py` | region, network, `/api/extend/{rid}`, alternatives/route/loop (via, bike, depart, weather, closures, avoid, infra_only, learned), suggested, amenities, geocode, exports, `/sw.js` |
 | `planning_api.py` | conditions, weather/{rid}, stops/{rid}, stages/{rid}, layers/{name} (incl. trails), network/score, regions |
-| `community_api.py` | hazards, feedback, places, favourites, learned profile, ride share + `/share/{token}` page |
+| `community_api.py` | hazards, feedback, places, favourites (+ route snapshot, `/api/favourites/{id}/route`), learned profile, ride share + `/share/{token}` page |
 | `sources_api.py` | `GET/POST /api/sources` (choices, availability, downloads, apply/rebuild job) |
 | `offline_api.py` | `/tiles/{z}/{x}/{y}.mvt`, offline status/manifest, basemap download job, `/api/backup` export/import |
 | `tracking_api.py` | GPS sources/live, `/location` (iPhone tracker), rides (+ heatmap), navigate |
 | `serialize.py` | `route_payload()` |
 
 ### `cycleroutes/devtools/` — `cycleroutes screenshots`
-`session.py` (ShotSession), `scenarios.py`, `scenarios_plan.py`, `scenarios_ride.py`, `scenarios_walk.py`, `scenarios_offline.py`, `report.py`, `screenshots.py`.
+`session.py` (ShotSession), `scenarios.py`, `scenarios_plan.py`, `scenarios_ride.py`, `scenarios_walk.py`, `scenarios_extend.py`, `scenarios_offline.py`, `report.py`, `screenshots.py`.
 
 ### `cycleroutes/cli.py`
 `build | walk | sources | offline | catalog | amenities | route | loop | gps | screenshots | serve [--https --serial-gps --ip-location]`.
@@ -147,7 +148,7 @@ map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 | `js/rides.js`, `js/search.js`, `js/more.js`, `js/sources.js` | rides list, place search, More tab (score, regions, offline), data-sources panel |
 
 ## Tests (`tests/`, offline)
-`test_scoring`, `test_routing`, `test_api`, `test_tracking`, `test_sources`, `test_planning`, `test_road_options`, `test_offline`, `test_data_sources`, `test_walking`
+`test_scoring`, `test_routing`, `test_api`, `test_tracking`, `test_sources`, `test_planning`, `test_road_options`, `test_offline`, `test_data_sources`, `test_walking`, `test_combine`
 (synthetic 6×6 grid in `conftest.py`; weather stubbed).
 
 ## Other

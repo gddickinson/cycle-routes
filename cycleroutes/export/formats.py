@@ -46,11 +46,15 @@ def route_segments_geojson(route: Route) -> dict:
     """Route as a FeatureCollection of edges carrying their stress/safety data,
     so the map can colour each stretch."""
     feats = []
-    for d in route.edge_data():
+    bounds = route.meta.get("leg_bounds") or {}
+
+    def leg_of(i: int) -> str:
+        return next((k for k, (a, b) in bounds.items() if a <= i < b), "route")
+    for i, d in enumerate(route.edge_data()):
         feats.append({
             "type": "Feature",
             "geometry": {"type": "LineString", "coordinates": _round(d["geometry"].coords)},
-            "properties": {"lts": d["lts"], "safety": round(d["safety"], 2),
+            "properties": {"lts": d["lts"], "safety": round(d["safety"], 2), "leg": leg_of(i),
                            "fun": round(d["fun"], 2), "name": str(d.get("name", "") or "")},
         })
     return {"type": "FeatureCollection", "features": feats}

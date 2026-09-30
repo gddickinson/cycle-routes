@@ -34,6 +34,7 @@ def route_payload(route_id: str, route: Route, stats: dict, title: str | None = 
         "profile": route.profile,
         "profile_label": profile_label(route.profile, mode),
         "tour": route.meta.get("tour"),
+        "legs": route.meta.get("legs"),
         "also_best_for": also,
         "kind": route.kind,
         "stats": stats,

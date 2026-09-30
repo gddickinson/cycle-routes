@@ -71,7 +71,7 @@ export class Plan {
   }
 
   async saveFavourite(route) {
-    await post("/api/favourites", { title: route.title, params: route.request || {} });
+    await post("/api/favourites", { title: route.title, params: route.request || {}, route_id: route.id });
     this.app.setStatus("Saved - find it under Rides › Saved routes.");
   }
 
@@ -84,8 +84,86 @@ export class Plan {
       <div class="actions"><button class="btn small primary" data-plan="${f.id}">Plan again</button>
       <button class="btn small secondary danger" data-fdel="${f.id}">Delete</button></div></article>`).join("");
     favs.forEach((f) => {
-      $(`[data-plan="${f.id}"]`).addEventListener("click", () => this.app.openPlan(f.params));
+      $(`[data-plan="${f.id}"]`).addEventListener("click", () => this.openFavourite(f));
       $(`[data-fdel="${f.id}"]`).addEventListener("click", async () => { await del(`/api/favourites/${f.id}`); this.showFavourites(); });
+    });
+  }
+
+  async openFavourite(f) {
+    if (f.params.snapshot) {
+      try {
+        const route = await api(`/api/favourites/${f.id}/route`);
+        this.app.addRoute(route);
+        this.app.setStatus(`${f.title} - opened as saved. Use 🧭 to get there from where you are.`);
+        return;
+      } catch (err) {
+        if (!f.params.start && !f.params.loop) { this.app.setStatus(err.message, true); return; }
+      }
+    }
+    this.app.openPlan(f.params);
+  }
+
+  // --- get there / loop / onward ---------------------------------------------------------
+  toggleExtend(route) {
+    const box = document.getElementById(`extend-${route.id}`);
+    if (!box) return;
+    if (!box.classList.contains("hidden")) { box.classList.add("hidden"); return; }
+    const isLoop = route.kind === "loop";
+    this.ext = { route, start: null, startLabel: "", stops: [], destination: null };
+    box.classList.remove("hidden");
+    box.innerHTML = `
+      <div class="ext-row"><b>Start from</b>
+        <div class="row-btns wrap"><button data-x="here" class="btn small secondary">◎ My location</button>
+          <button data-x="pick-start" class="btn small secondary">Tap the map</button>
+          ${[...document.querySelectorAll("#place-chips [data-go]")].map((b) =>
+            `<button data-x="place" data-id="${b.dataset.go}" class="btn small secondary">${esc(b.textContent)}</button>`).join("")}</div>
+        <div class="facts" data-x="start-label">No start chosen - the route is used as it is.</div></div>
+      <div class="ext-row"><b>Join the route at</b>
+        <select data-x="join"><option value="start" ${isLoop ? "" : "selected"}>its start</option>
+          <option value="nearest" ${isLoop ? "selected" : ""}>the nearest point to my start</option></select></div>
+      <div class="ext-row"><b>Afterwards</b>
+        <label class="toggle"><input type="radio" name="after-${route.id}" value="end" checked> finish where the route ends</label>
+        <label class="toggle"><input type="radio" name="after-${route.id}" value="return"> return to my start (make it a loop)</label>
+        <label class="toggle"><input type="radio" name="after-${route.id}" value="destination"> continue to a destination
+          <button data-x="pick-dest" class="btn small secondary">Tap the map</button></label>
+        <div class="facts" data-x="dest-label"></div></div>
+      <div class="ext-row"><b>Stops after the route</b> <button data-x="add-stop" class="btn small secondary">+ Add stop</button>
+        <ol class="ext-stops" data-x="stops"></ol></div>
+      <button data-x="go" class="btn small primary">Plan combined route</button>`;
+    const $x = (k) => box.querySelector(`[data-x="${k}"]`);
+    const setStart = (ll, label) => {
+      this.ext.start = ll;
+      $x("start-label").textContent = `Start: ${label || `${ll[0].toFixed(4)}, ${ll[1].toFixed(4)}`}`;
+    };
+    $x("here").addEventListener("click", async () => {
+      try { setStart(await this.app.rmap.locate(), "my location"); } catch (e) { this.app.setStatus(`No location: ${e.message}`, true); }
+    });
+    $x("pick-start").addEventListener("click", async () => setStart(await this.app.pickOnMap("Tap your start point on the map")));
+    box.querySelectorAll("[data-x=place]").forEach((b) => b.addEventListener("click", async () => {
+      const p = (await api("/api/places")).find((q) => String(q.id) === b.dataset.id);
+      if (p) setStart([p.lat, p.lon], p.name);
+    }));
+    $x("pick-dest").addEventListener("click", async () => {
+      this.ext.destination = await this.app.pickOnMap("Tap your final destination on the map");
+      $x("dest-label").textContent = `Destination: ${this.ext.destination.map((n) => n.toFixed(4)).join(", ")}`;
+      box.querySelector(`input[value=destination]`).checked = true;
+    });
+    $x("add-stop").addEventListener("click", async () => {
+      const ll = await this.app.pickOnMap("Tap a stop to visit after the route");
+      this.ext.stops.push(ll);
+      $x("stops").innerHTML = this.ext.stops.map((p) => `<li>${p[0].toFixed(4)}, ${p[1].toFixed(4)}</li>`).join("");
+    });
+    $x("go").addEventListener("click", async () => {
+      const after = box.querySelector(`input[name="after-${route.id}"]:checked`).value;
+      this.app.setStatus("Planning the combined route…");
+      try {
+        const r = await post(`/api/extend/${route.id}?${this.app.settingsQuery()}`, {
+          start: this.ext.start, join: $x("join").value, after, stops: this.ext.stops,
+          destination: this.ext.destination });
+        r.request = null;
+        this.app.addRoute(r);
+        this.app.setStatus(`Combined route: ${r.legs?.map((l) => `${l.label.toLowerCase()} ${l.km} km`).join(", ") || ""}`);
+      } catch (err) { this.app.setStatus(err.message, true); }
     });
   }
 

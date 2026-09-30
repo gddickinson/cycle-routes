@@ -21,7 +21,8 @@ import requests
 from playwright.sync_api import sync_playwright
 
 from cycleroutes import config
-from cycleroutes.devtools import scenarios, scenarios_offline, scenarios_plan, scenarios_ride, scenarios_walk
+from cycleroutes.devtools import (scenarios, scenarios_extend, scenarios_offline, scenarios_plan, scenarios_ride,
+                                  scenarios_walk)
 from cycleroutes.devtools.report import write_report
 from cycleroutes.devtools.session import Shot, ShotSession, write_manifest
 
@@ -111,6 +112,8 @@ def run(out_dir: Path, url: str | None = None, region: str = config.DEFAULT_REGI
                              ("race", scenarios_plan.stale_results_are_dropped)):
                 _run_group(browser, name, DESKTOP, out_dir, shots, lambda s, fn=fn: fn(s, base, pts))
             _run_group(browser, "walk", DESKTOP, out_dir, shots, lambda s: scenarios_walk.walking(s, base, pts))
+            _run_group(browser, "extend", DESKTOP, out_dir, shots,
+                       lambda s: scenarios_extend.extend_suggested(s, base, pts))
             _run_group(browser, "offline", DESKTOP, out_dir, shots,
                        lambda s: scenarios_offline.offline(s, base, pts))
             _run_group(browser, "phone", PHONE, out_dir, shots,

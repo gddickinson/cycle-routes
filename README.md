@@ -30,6 +30,12 @@ Build it for an area with `cycleroutes walk` (after `cycleroutes build`).
 - **Your ride, your conditions**: bike type (road, gravel, MTB, e-bike, cargo, kids), departure
   time (after dark → lit streets), live wind and heat (Open-Meteo → headwind and shade weighting),
   current road-work closures (City of Austin WZDx feed) and rider hazard reports all change the route.
+- **Get there / extend** (🧭 on any route card - suggested rides and walks, saved routes, tours,
+  loops): start from your location, a tapped point or a saved place; join the route at its start
+  or at the nearest point (loops can start anywhere); afterwards finish there, **return to your
+  start** (a loop) or **continue to a destination**, with extra stops. The getting-there and onward
+  parts are drawn dashed; the whole thing is rated, navigable, printable and saveable. Saved routes
+  keep an exact copy, so suggested and combined routes reopen as they were.
 - **Road choices**: avoid major, secondary or busy roads (measured traffic), stressful streets,
   unpaved surfaces, steps, sidewalks, service roads/parking lots, or trails; and **bike lanes, cycle
   paths & trails only (where possible)**. Protected lanes beside major roads are not "avoided";

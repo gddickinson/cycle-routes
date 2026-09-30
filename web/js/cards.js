@@ -55,6 +55,11 @@ function walkFacts(s) {
   return `<div class="facts">${f.map(esc).join(" · ")}</div>`;
 }
 
+function legList(r) {
+  if (!r.legs || r.legs.length < 2) return "";
+  return `<div class="facts legs">${r.legs.map((l) => `<span class="leg leg-${l.kind}">${esc(l.label)} ${l.km} km</span>`).join(" · ")}</div>`;
+}
+
 function tourList(r) {
   if (!r.tour?.length) return "";
   return `<ol class="tour-stops">${r.tour.map((t) => `<li><b>${esc(t.name)}</b> <small>${esc((t.kind || "").replace(/_/g, " "))}</small></li>`).join("")}</ol>`;
@@ -81,7 +86,7 @@ function details(r, colors) {
     ${elevationSvg(r.elevation)}
     <div class="facts">↑ ${s.ascent_m} m · ↓ ${s.descent_m} m · max ${s.max_grade_pct}% ·
       ${s.bike_infra_pct}% bike infrastructure · ${s.scenic_pct}% by parks/water</div>
-    ${tourList(r)}${walkFacts(s)}${dataFacts(s)}${routes}
+    ${legList(r)}${tourList(r)}${walkFacts(s)}${dataFacts(s)}${routes}
     <div class="actions">${ride}
       <select class="print-select" data-act="print" aria-label="Print">
         <option value="">🖨 Print…</option><option value="standard">Overview map</option>
@@ -89,9 +94,11 @@ function details(r, colors) {
         <option value="standard&scale=10000">Map at 1:10,000</option><option value="standard&scale=25000">Map at 1:25,000</option>
       </select>
       <a class="btn small secondary" href="/api/export/${r.id}.gpx" download>GPX</a>
+      <button class="btn small secondary" data-act="extend">🧭 Get there / extend</button>
       <button class="btn small secondary" data-act="save">★ Save</button>
       <button class="btn small secondary" data-act="link">🔗 Link</button>
     </div>
+    <div class="extend hidden" id="extend-${r.id}"></div>
     <div class="extra" id="extra-${r.id}"><div class="facts">Loading stops and weather…</div></div>
     <ul class="cues">${cues}</ul>
   </div>`;
@@ -119,11 +126,12 @@ export function renderCards(container, routes, selectedId, colors, h) {
   container.querySelectorAll(".card").forEach((el) => {
     const r = routes.find((x) => x.id === el.dataset.id);
     el.addEventListener("click", (ev) => {
-      if (ev.target.closest("a, select, .extra")) return;
+      if (ev.target.closest("a, select, .extra, .extend")) return;
       const act = ev.target.closest("[data-act]")?.dataset.act;
       if (act === "ride") return h.onRide(r.id);
       if (act === "save") return h.onSave(r);
       if (act === "link") return h.onLink(r);
+      if (act === "extend") return h.onExtend(r);
       h.onSelect(r.id);
     });
     const sel = el.querySelector(".print-select");

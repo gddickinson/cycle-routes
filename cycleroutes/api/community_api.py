@@ -85,9 +85,38 @@ def favourites():
 
 @router.post("/api/favourites")
 def add_favourite(body: dict = Body(...)):
-    if not body.get("params"):
-        raise HTTPException(400, "'params' (the route request) is required")
-    return {"id": state().community.add_favourite(body.get("title") or "Favourite route", body["params"])}
+    """Save a route: its planning request (to re-plan) and a snapshot of the route itself."""
+    s = state()
+    params = dict(body.get("params") or {})
+    rid = body.get("route_id")
+    if rid:
+        route, _, _ = s.get(rid)
+        params["snapshot"] = {"mode": route.graph.graph.get("mode", "bike"), "edges": [list(e) for e in route.edges],
+                              "profile": route.profile, "kind": route.kind,
+                              "meta": {k: route.meta[k] for k in ("legs", "leg_bounds", "tour") if k in route.meta}}
+    if not params:
+        raise HTTPException(400, "Nothing to save: send 'route_id' and/or 'params'")
+    return {"id": s.community.add_favourite(body.get("title") or "Favourite route", params)}
+
+
+@router.get("/api/favourites/{fav_id}/route")
+def open_favourite(fav_id: int):
+    """The saved route exactly as it was (rated with today's conditions)."""
+    from cycleroutes.routing.combine import route_from_edges
+    from cycleroutes.routing.rating import rate
+    from cycleroutes.routing.router import RoutingError
+    s = state()
+    fav = next((f for f in s.community.favourites() if f["id"] == fav_id), None)
+    if not fav or "snapshot" not in fav["params"]:
+        raise HTTPException(404, "No saved copy of this route - plan it again")
+    snap = fav["params"]["snapshot"]
+    try:
+        route = route_from_edges(s.router_for(snap["mode"]).graph, snap["edges"], snap["profile"], snap["kind"],
+                                 fav["title"])
+        route.meta.update(snap.get("meta", {}))
+    except RoutingError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return s.store(route, rate(route), fav["title"])
 
 
 @router.delete("/api/{table}/{row_id}")

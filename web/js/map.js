@@ -99,7 +99,8 @@ export class RouteMap {
       const halo = L.geoJSON(sel.geojson, { renderer: this.renderer, interactive: false,
         style: { color: "#fff", weight: 9, opacity: 0.95 } }).addTo(this.routeLayer);
       L.geoJSON(sel.geojson, { renderer: this.renderer,
-        style: (f) => ({ color: this.color(f.properties.lts), weight: 5.5, opacity: 1 }),
+        style: (f) => ({ color: this.color(f.properties.lts), weight: f.properties.leg === "route" || !f.properties.leg ? 5.5 : 4.5,
+          opacity: 1, dashArray: f.properties.leg && f.properties.leg !== "route" ? "9 7" : null }),
         onEachFeature: (f, layer) => {
           const n = f.properties.name ? `${f.properties.name}<br>` : "";
           layer.bindTooltip(`${n}Stress LTS ${f.properties.lts} · safety ${Math.round(f.properties.safety * 10)}/10`,

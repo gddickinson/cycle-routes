@@ -123,3 +123,20 @@ def test_walk_mode_api(client, region):
     assert client.get(f"/api/route?start={a}&end={b}&mode=walk&avoid=major").status_code == 400
     assert client.get(f"/api/loop?start={a}&km=2&mode=walk&profile=green&count=1").status_code == 200
     assert client.get(f"/api/route?start={a}&end={b}&mode=boat").status_code == 400
+
+
+def test_extend_and_saved_snapshot_api(client, region):
+    a, b = _ll(node_latlon(region, 2, 2)), _ll(node_latlon(region, 2, 4))
+    base = client.get(f"/api/route?start={a}&end={b}&profile=balanced").json()
+    home = list(node_latlon(region, 0, 0))
+    res = client.post(f"/api/extend/{base['id']}", json={"start": home, "after": "return"})
+    assert res.status_code == 200
+    r = res.json()
+    assert [l["kind"] for l in r["legs"]] == ["approach", "route", "onward"] and r["kind"] == "loop"
+    assert "back to start" in r["title"]
+    assert client.post(f"/api/extend/{base['id']}", json={"after": "destination"}).status_code == 422
+    fav = client.post("/api/favourites", json={"title": "Combined", "route_id": r["id"]}).json()
+    opened = client.get(f"/api/favourites/{fav['id']}/route").json()
+    assert opened["stats"]["distance_km"] == r["stats"]["distance_km"] and opened["title"] == "Combined"
+    assert [l["kind"] for l in opened["legs"]] == ["approach", "route", "onward"]     # parts kept
+    client.delete(f"/api/favourites/{fav['id']}")
