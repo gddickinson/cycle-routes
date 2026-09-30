@@ -4,6 +4,8 @@ Expects edges already enriched with: length, lts, scenic (0-1), route_rank (0-4)
 ascent/descent (m). See cycleroutes.data.enrich.
 """
 
+import math
+
 from cycleroutes import config
 from cycleroutes.scoring import lts as lts_mod
 from cycleroutes.scoring import tags
@@ -28,19 +30,29 @@ SURFACE_QUALITY = {
 
 def safety(edge: dict) -> float:
     score = LTS_SAFETY[edge["lts"]]
+    # Recorded bike crashes on this segment (Vision Zero): each one costs a little,
+    # serious/fatal ones more, capped so one bad block doesn't dominate.
+    score -= min(0.35, 0.06 * edge.get("crashes", 0) + 0.12 * edge.get("crashes_severe", 0))
     if tags.first(edge, "lit") == "yes":
         score += 0.05
     if edge.get("route_rank", 0) > 0:
         score += 0.05  # signed routes usually have wayfinding and crossings
-    return min(score, 1.0)
+    return min(max(score, 0.0), 1.0)
 
 
 def quietness(edge: dict) -> float:
-    score = QUIET_BY_HIGHWAY.get(tags.highway(edge), 0.6)
-    if tags.cycleway_kind(edge) == "track":
-        score = max(score, 0.8)  # separated from the traffic that is there
-    if tags.lanes(edge) >= 4:
-        score *= 0.6
+    aadt = edge.get("aadt")
+    if aadt:   # measured vehicles/day: 100 -> 1.0 ... 40,000 -> 0.0 (log scale)
+        score = float(min(max(1 - (math.log10(aadt) - 2) / (math.log10(40000) - 2), 0.0), 1.0))
+    else:
+        score = QUIET_BY_HIGHWAY.get(tags.highway(edge), 0.6)
+        if tags.lanes(edge) >= 4:
+            score *= 0.6
+    if tags.cycleway_kind(edge) == "track" or tags.highway(edge) in lts_mod.OFF_ROAD:
+        score = max(score, 0.8)  # separated from whatever traffic is there
+    db = edge.get("noise_db")
+    if db:     # 42 dB or less -> calm, 72 dB -> loud
+        score = 0.75 * score + 0.25 * min(max((72 - db) / 30, 0.0), 1.0)
     return score
 
 
@@ -60,8 +72,9 @@ def fun(edge: dict) -> float:
     """Pleasantness: scenery, calm, being on a greenway/signed route, smoothness."""
     greenway = 1.0 if tags.highway(edge) in lts_mod.OFF_ROAD else 0.0
     route = min(edge.get("route_rank", 0), 2) / 2
-    return (0.45 * edge.get("scenic", 0.0) + 0.25 * quietness(edge)
-            + 0.15 * max(greenway, route) + 0.15 * surface(edge))
+    shade = edge.get("shade", 0.3)
+    return (0.38 * edge.get("scenic", 0.0) + 0.22 * quietness(edge)
+            + 0.15 * max(greenway, route) + 0.12 * surface(edge) + 0.13 * shade)
 
 
 def speed_kmh(edge: dict) -> float:

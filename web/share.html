@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Ride</title>
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root { --bg: #fff; --text: #1d2320; --muted: #5d6762; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #171b19; --text: #e7ece9; --muted: #9aa5a0; } }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+      font: 15px/1.4 system-ui, -apple-system, sans-serif; }
+    #map { position: fixed; inset: 0; }
+    .card { position: fixed; z-index: 1000; left: 12px; right: 12px; bottom: 12px; max-width: 420px;
+      background: var(--bg); border-radius: 12px; padding: 12px 16px; box-shadow: 0 6px 24px rgba(0,0,0,.2); }
+    .card h1 { font-size: 17px; margin: 0 0 4px; } .muted { color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="card"><h1 id="title">Live ride</h1><div id="info" class="muted">Loading…</div></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const token = location.pathname.split("/").pop();
+    const map = L.map("map").setView([30.27, -97.74], 13);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
+    let track, dot, route, first = true;
+    async function tick() {
+      const res = await fetch(`/api/share/${token}`);
+      if (!res.ok) { document.getElementById("info").textContent = "This link has expired."; return; }
+      const d = await res.json();
+      document.getElementById("title").textContent = d.name;
+      if (d.route && !route) route = L.geoJSON(d.route, { style: { color: "#1a7f37", weight: 4, opacity: .6 } }).addTo(map);
+      const pts = d.points.map((p) => [p[0], p[1]]);
+      if (!pts.length) { document.getElementById("info").textContent = "Waiting for the first GPS position…"; }
+      else {
+        if (track) track.remove();
+        track = L.polyline(pts, { color: "#1f6feb", weight: 4 }).addTo(map);
+        const last = d.points.at(-1);
+        if (!dot) dot = L.circleMarker(pts.at(-1), { radius: 9, color: "#fff", weight: 3, fillColor: "#1f6feb", fillOpacity: 1 }).addTo(map);
+        dot.setLatLng(pts.at(-1));
+        if (first) { map.fitBounds(track.getBounds().pad(0.3)); first = false; }
+        const ago = Math.round(Date.now() / 1000 - last[2]);
+        document.getElementById("info").textContent = d.finished ? "Ride finished." :
+          `Last seen ${ago < 90 ? ago + " s" : Math.round(ago / 60) + " min"} ago · updates every 10 s`;
+      }
+      if (!d.finished) setTimeout(tick, 10000);
+    }
+    tick();
+  </script>
+</body>
+</html>

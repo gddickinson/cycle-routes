@@ -10,8 +10,9 @@ class Route:
     graph: nx.MultiDiGraph
     edges: list[tuple[int, int, int]]          # (u, v, key) in riding order
     profile: str
-    kind: str = "a_to_b"                      # "a_to_b" or "loop"
-    meta: dict = field(default_factory=dict)  # e.g. requested loop distance
+    kind: str = "a_to_b"                      # "a_to_b", "loop" or "ride"
+    meta: dict = field(default_factory=dict)  # e.g. requested loop distance, notices
+    ctx: object = None                        # RouteContext used to plan it (bike, wind...)
 
     @property
     def nodes(self) -> list[int]:
@@ -27,7 +28,10 @@ class Route:
 
     @property
     def time_s(self) -> float:
-        return sum(d["time_s"] for d in self.edge_data())
+        if self.ctx is None:
+            return sum(d["time_s"] for d in self.edge_data())
+        from cycleroutes.routing.context import travel_time_s
+        return sum(travel_time_s(d, self.ctx) for d in self.edge_data())
 
     def coords(self) -> list[tuple[float, float]]:
         """(lon, lat) polyline of the whole route without duplicate joints."""

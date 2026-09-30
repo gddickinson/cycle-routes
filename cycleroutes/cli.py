@@ -93,6 +93,17 @@ def cmd_screenshots(args) -> None:
         raise SystemExit(1)
 
 
+def cmd_sources(args) -> None:
+    """Apply extra open data (3DEP, crashes, traffic counts, canopy, noise...) to a built region."""
+    from cycleroutes.data.region import load_region, save_region
+    from cycleroutes.data.sources.apply import apply_all
+    region = load_region(args.region)
+    report = apply_all(region, refresh=args.refresh, only=set(args.only.split(",")) if args.only else None)
+    save_region(region)
+    for name, result in report.items():
+        print(f"{name:10s} {result}")
+
+
 def cmd_amenities(args) -> None:
     from cycleroutes.data.amenities import fetch_amenities
     from cycleroutes.data.region import load_region
@@ -200,6 +211,12 @@ def main(argv=None) -> None:
                    help="offer IP geolocation as a source (sends this machine's IP to ip-api.com)")
     v.set_defaults(func=cmd_serve)
 
+    so = sub.add_parser("sources", help="apply extra open data (elevation, crashes, traffic, shade, noise)")
+    so.add_argument("--region", default=d["name"])
+    so.add_argument("--refresh", action="store_true", help="download again instead of using the cache")
+    so.add_argument("--only", help="comma list: elevation,canopy,noise,aadt,comfort,crashes,counters,stops")
+    so.set_defaults(func=cmd_sources)
+
     am = sub.add_parser("amenities", help="(re)fetch bike shops, water, toilets, parking for a region")
     am.add_argument("--region", default=d["name"])
     am.set_defaults(func=cmd_amenities)
@@ -210,7 +227,7 @@ def main(argv=None) -> None:
     g.set_defaults(func=cmd_gps)
 
     args = p.parse_args(argv)
-    logging.basicConfig(level=logging.INFO if args.verbose or args.cmd in ("build", "catalog")
+    logging.basicConfig(level=logging.INFO if args.verbose or args.cmd in ("build", "catalog", "sources")
                         else logging.WARNING, format="%(asctime)s %(name)s: %(message)s")
     logging.getLogger("rasterio").setLevel(logging.WARNING)
     args.func(args)

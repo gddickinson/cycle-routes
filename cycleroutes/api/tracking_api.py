@@ -11,6 +11,7 @@ from datetime import datetime
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import Response
 
+from cycleroutes import config
 from cycleroutes.api.state import state
 from cycleroutes.routing.rating import rate
 from cycleroutes.tracking.matching import match_track
@@ -87,7 +88,13 @@ def iphone_tracker(payload: dict = Body(...)):
 @router.post("/api/rides")
 def start_ride(body: dict = Body(default={})):
     name = body.get("name") or f"Ride {datetime.now():%Y-%m-%d %H:%M}"
-    ride_id = state().rides.start(name, body.get("source", "phone"), body.get("route_id"))
+    s = state()
+    ride_id = s.rides.start(name, body.get("source", "phone"), body.get("route_id"))
+    if body.get("route_id") in s.routes:    # learn from the routes you actually choose to ride
+        route = s.routes[body["route_id"]][0]
+        prof = config.PROFILES.get(route.profile)
+        if prof:
+            s.community.record_choice(route.profile, prof.weights())
     return {"id": ride_id, "name": name}
 
 

@@ -9,7 +9,9 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from cycleroutes import config
+from cycleroutes.api.live import LiveData
 from cycleroutes.api.serialize import route_payload
+from cycleroutes.community.store import CommunityStore
 from cycleroutes.data.amenities import load_amenities
 from cycleroutes.data.region import load_region
 from cycleroutes.export.formats import network_geojson
@@ -33,6 +35,8 @@ class AppState:
         self.routes: OrderedDict[str, tuple] = OrderedDict()
         self.navigators: dict[str, Navigator] = {}
         self.rides = RideStore(rides_db)
+        self.community = CommunityStore(rides_db)
+        self.live = LiveData(self.region, self.community)
         self.gps = ProviderManager(include_ip=os.environ.get("CYCLEROUTES_IP_LOCATION") == "1",
                                    scan_serial=os.environ.get("CYCLEROUTES_SERIAL_GPS") == "1")
         self.suggested = []

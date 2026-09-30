@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 
 PROFILE_RATING_KEY = {
     "safest": "safety", "family": "safety", "scenic": "fun", "flattest": "hills",
-    "quiet": "traffic", "fastest": "speed",
+    "quiet": "traffic", "fastest": "speed", "shady": "shade",
 }
 
 
 def _loop_for_bearing(router: Router, start_node: int, bearing: float,
-                      side_m: float, profile) -> Route:
+                      side_m: float, profile, ctx=None) -> Route:
     graph = router.graph
     slat, slon = graph.nodes[start_node]["y"], graph.nodes[start_node]["x"]
     a = router.index.nearest(*geo.destination(slat, slon, bearing, side_m))[0]
@@ -34,13 +34,13 @@ def _loop_for_bearing(router: Router, start_node: int, bearing: float,
     penalties: dict = {}
     edges = []
     for u, v in ((start_node, a), (a, b), (b, start_node)):
-        cost = make_cost(prof, penalties)
+        cost = make_cost(prof, penalties, graph, ctx)
         nodes = shortest_nodes(graph, u, v, cost)
         leg = edges_from_nodes(graph, nodes, cost)
         edges.extend(leg)
         for x, y, _ in leg:
             penalties[(min(x, y), max(x, y))] = config.LOOP_REUSE_PENALTY
-    return Route(graph, edges, name, kind="loop")
+    return Route(graph, edges, name, kind="loop", ctx=ctx)
 
 
 def _reuse_fraction(route: Route) -> float:
@@ -54,7 +54,7 @@ def _reuse_fraction(route: Route) -> float:
 
 
 def generate_loops(router: Router, start: tuple[float, float], distance_km: float,
-                   profile="scenic", count: int = 3) -> list[tuple[Route, dict]]:
+                   profile="scenic", count: int = 3, ctx=None) -> list[tuple[Route, dict]]:
     """Up to `count` distinct loops near distance_km, best first, with ratings."""
     start_node = router.snap(*start)
     side_m = distance_km * 1000 / (3 * config.LOOP_DETOUR_FACTOR)
@@ -64,7 +64,7 @@ def generate_loops(router: Router, start: tuple[float, float], distance_km: floa
     for i in range(config.LOOP_BEARINGS):
         try:
             loop = _loop_for_bearing(router, start_node, i * 360 / config.LOOP_BEARINGS,
-                                     side_m, profile)
+                                     side_m, profile, ctx)
         except RoutingError as exc:
             logger.debug("Bearing %d skipped: %s", i, exc)
             continue
@@ -76,7 +76,7 @@ def generate_loops(router: Router, start: tuple[float, float], distance_km: floa
         stats["reuse_pct"] = round(100 * reuse, 1)
         # Rank by the profile's headline rating, penalising a poor distance match
         # and riding the same street twice.
-        score = stats["ratings"][key] + 0.5 * stats["ratings"]["overall"] - 10 * err - 5 * reuse
+        score = stats["ratings"].get(key, stats["ratings"]["overall"]) + 0.5 * stats["ratings"]["overall"] - 10 * err - 5 * reuse
         candidates.append((score, err, loop, stats))
 
     candidates.sort(key=lambda c: -c[0])

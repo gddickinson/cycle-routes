@@ -15,6 +15,12 @@ def _weighted(route: Route, key: str) -> float:
     return float((lengths * vals).sum() / max(lengths.sum(), 1))
 
 
+def _weighted_default(route: Route, key: str, default: float) -> float:
+    lengths = np.array([d["length"] for d in route.edge_data()])
+    vals = np.array([d.get(key, default) for d in route.edge_data()], dtype=float)
+    return float((lengths * vals).sum() / max(lengths.sum(), 1))
+
+
 def max_grade_pct(profile: list[tuple[float, float]]) -> float:
     """Steepest sustained climb (%) over runs of >= MIN_GRADE_RUN_M."""
     if len(profile) < 2:
@@ -73,14 +79,30 @@ def rate(route: Route, fastest_time_s: float | None = None) -> dict:
     else:
         speed = (avg_kmh - 10) / (config.BASE_CYCLING_SPEED_KMH - 10) * 10
 
+    crashes = sum(d.get("crashes", 0) for d in route.edge_data())
+    severe = sum(d.get("crashes_severe", 0) for d in route.edge_data())
+    nodes = route.graph.nodes
+    crossings = sum(1 for (u, v, _), d in zip(route.edges, route.edge_data())
+                    if nodes[v].get("risky_crossing") and d["lts"] <= 2
+                    and (tags.first(d, "name") or "?") not in nodes[v].get("busy_names", ()))
+    measured = sum(d["length"] for d in route.edge_data() if d.get("aadt"))
+    busiest = max((d.get("aadt", 0) for d in route.edge_data()), default=0)
+    has_noise = any("noise_db" in d for d in route.edge_data())
+    has_shade = any("shade" in d for d in route.edge_data())
+    # each unsignalised busy crossing on a low-stress ride knocks safety down a little
+    crossing_penalty = min(2.0, 0.25 * crossings)
+
     ratings = {
-        "safety": _clamp10(10 * _weighted(route, "safety")),
+        "safety": _clamp10(10 * _weighted(route, "safety") - crossing_penalty),
         "fun": _clamp10(10 * _weighted(route, "fun")),
         "traffic": _clamp10(10 * _weighted(route, "quiet")),
         "hills": _clamp10(10 - climb_per_km / 2.5),     # 10 = flat, 0 = 25 m/km
         "speed": _clamp10(speed),
         "surface": _clamp10(10 * _weighted(route, "surface_q")),
+        "shade": _clamp10(10 * _weighted_default(route, "shade", 0.3)) if has_shade else None,
     }
+    if ratings["shade"] is None:
+        del ratings["shade"]
     ratings["overall"] = _clamp10(
         0.3 * ratings["safety"] + 0.2 * ratings["fun"] + 0.15 * ratings["traffic"]
         + 0.1 * ratings["hills"] + 0.15 * ratings["speed"] + 0.1 * ratings["surface"])
@@ -100,4 +122,10 @@ def rate(route: Route, fastest_time_s: float | None = None) -> dict:
         "signed_routes": route_names[:6],
         "scenic_pct": round(100 * _weighted(route, "scenic"), 1),
         "ratings": ratings,
+        "crashes": crashes, "crashes_severe": severe, "risky_crossings": crossings,
+        "measured_traffic_pct": round(100 * measured / max(length, 1), 1),
+        "busiest_aadt": int(busiest) or None,
+        "avg_noise_db": round(_weighted_default(route, "noise_db", 45.0), 1) if has_noise else None,
+        "notice": route.meta.get("notice"),
+        "context": route.ctx.describe() if route.ctx is not None else [],
     }

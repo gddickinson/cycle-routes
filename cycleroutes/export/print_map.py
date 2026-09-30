@@ -22,14 +22,25 @@ A4 = (8.27, 11.69)
 RATING_ORDER = ["overall", "safety", "fun", "traffic", "hills", "speed", "surface"]
 RATING_LABELS = {"overall": "Overall", "safety": "Safety", "fun": "Fun & scenery",
                  "traffic": "Low traffic", "hills": "Easy climbing", "speed": "Speed",
-                 "surface": "Surface"}
+                 "surface": "Surface", "shade": "Shade"}
 CUES_PER_PAGE = 34
 
 
-def _view(lons, lats, aspect: float, pad: float = 0.08):
-    """Zoom and tile-space view (x0, y0, x1, y1) around the route, matching the
-    map panel's width/height aspect so the whole panel is filled."""
+def _view(lons, lats, aspect: float, pad: float = 0.08, scale: float | None = None,
+          width_in: float = 7.3):
+    """Zoom and tile-space view (x0, y0, x1, y1) around the given points, matching the
+    map panel's width/height aspect. With `scale` (e.g. 10000 for 1:10,000) the view
+    is centred on the points at that paper scale instead of fitting them."""
     w, e, s, n = min(lons), max(lons), min(lats), max(lats)
+    if scale:
+        lat0 = (s + n) / 2
+        half_w_m = width_in * 0.0254 * scale / 2
+        half_h_m = half_w_m / aspect
+        dlon = half_w_m / (111_320 * math.cos(math.radians(lat0)))
+        dlat = half_h_m / 111_320
+        cx, cy = (w + e) / 2, (s + n) / 2
+        w, e, s, n = cx - dlon, cx + dlon, cy - dlat, cy + dlat
+        pad = 0.0
     zoom = choose_zoom(w, s, e, n, max_tiles=24)
     x0, y0 = lonlat_to_tile(w, n, zoom)
     x1, y1 = lonlat_to_tile(e, s, zoom)
@@ -43,10 +54,14 @@ def _view(lons, lats, aspect: float, pad: float = 0.08):
     return zoom, (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
 
 
-def _draw_map(ax, route: Route, tiles: TileManager, aspect: float) -> None:
+def _draw_map(ax, route: Route, tiles: TileManager, aspect: float, focus=None,
+              scale: float | None = None, width_in: float = 7.3) -> None:
+    """Draw the route on a basemap. `focus`: [(lon, lat)] to frame (default: whole route)."""
     coords = route.coords()
     lons, lats = [c[0] for c in coords], [c[1] for c in coords]
-    zoom, (vx0, vy0, vx1, vy1) = _view(lons, lats, aspect)
+    fl = focus or coords
+    zoom, (vx0, vy0, vx1, vy1) = _view([c[0] for c in fl], [c[1] for c in fl], aspect,
+                                       scale=scale, width_in=width_in)
     w, n = tile_to_lonlat(vx0, vy0, zoom)
     e, s = tile_to_lonlat(vx1, vy1, zoom)
     img, (x0, y0, x1, y1) = tiles.stitch(w, s, e, n, zoom)
@@ -105,7 +120,8 @@ def _scale_bar(ax, zoom, lat, x_left, y_bottom, width_tiles) -> None:
             fontsize=8, zorder=9, bbox=dict(fc="white", ec="none", alpha=0.8, pad=1))
 
 
-def _map_page(pdf, route: Route, stats: dict, title: str, tiles: TileManager) -> None:
+def _map_page(pdf, route: Route, stats: dict, title: str, tiles: TileManager,
+              scale: float | None = None) -> None:
     fig = plt.figure(figsize=A4)
     fig.text(0.06, 0.965, title, fontsize=17, weight="bold", va="top")
     summary = (f"{stats['distance_km']} km  ·  ~{stats['duration_min']:.0f} min  ·  "
@@ -114,7 +130,9 @@ def _map_page(pdf, route: Route, stats: dict, title: str, tiles: TileManager) ->
     fig.text(0.06, 0.935, summary, fontsize=10, va="top", color="#333")
     rect = [0.06, 0.1, 0.88, 0.82]
     ax = fig.add_axes(rect)
-    _draw_map(ax, route, tiles, aspect=(rect[2] * A4[0]) / (rect[3] * A4[1]))
+    _draw_map(ax, route, tiles, aspect=(rect[2] * A4[0]) / (rect[3] * A4[1]), scale=scale)
+    if scale:
+        fig.text(0.94, 0.935, f"Scale 1:{int(scale):,}", ha="right", va="top", fontsize=9, color="#333")
     handles = [Line2D([], [], color=config.LTS_COLORS[k], lw=4, label=config.LTS_LABELS[k])
                for k in (1, 2, 3, 4)]
     fig.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.05, 0.015), ncol=2,
@@ -123,14 +141,29 @@ def _map_page(pdf, route: Route, stats: dict, title: str, tiles: TileManager) ->
     plt.close(fig)
 
 
-def _details_page(pdf, route: Route, stats: dict, cues, title: str) -> None:
+def _qr_image(url: str):
+    import qrcode
+    qr = qrcode.QRCode(border=1, box_size=6)
+    qr.add_data(url)
+    qr.make(fit=True)
+    return qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+
+def _details_page(pdf, route: Route, stats: dict, cues, title: str, qr_url: str | None = None,
+                  extra_facts: list[str] | None = None) -> None:
     fig = plt.figure(figsize=A4)
     fig.text(0.06, 0.965, f"{title} — details", fontsize=14, weight="bold", va="top")
+    if qr_url:
+        ax_q = fig.add_axes([0.83, 0.845, 0.12, 0.085])
+        ax_q.imshow(_qr_image(qr_url))
+        ax_q.axis("off")
+        fig.text(0.89, 0.838, "Scan for GPX", ha="center", va="top", fontsize=7)
 
     ax_r = fig.add_axes([0.2, 0.74, 0.3, 0.19])
-    vals = [stats["ratings"][k] for k in RATING_ORDER]
+    order = [k for k in RATING_ORDER + ["shade"] if k in stats["ratings"]]
+    vals = [stats["ratings"][k] for k in order]
     ax_r.barh(range(len(vals)), vals, color=["#333"] + ["#4a7bb7"] * (len(vals) - 1))
-    ax_r.set_yticks(range(len(vals)), [RATING_LABELS[k] for k in RATING_ORDER], fontsize=8)
+    ax_r.set_yticks(range(len(vals)), [RATING_LABELS[k] for k in order], fontsize=8)
     ax_r.invert_yaxis()
     ax_r.set_xlim(0, 10)
     ax_r.set_title("Ratings (0-10, higher is better)", fontsize=9, loc="left")
@@ -147,7 +180,14 @@ def _details_page(pdf, route: Route, stats: dict, cues, title: str) -> None:
              "Stress mix: " + " / ".join(f"LTS{k} {v:.0f}%" for k, v in stats["lts_pct"].items())]
     if stats.get("signed_routes"):
         facts.append("Routes: " + ", ".join(stats["signed_routes"][:3]))
-    fig.text(0.58, 0.93, "\n".join(textwrap.shorten(f, 60) for f in facts), fontsize=8.5,
+    if stats.get("crashes") is not None and "crashes" in stats:
+        facts.append(f"Recorded bike crashes on route: {stats['crashes']} ({stats.get('crashes_severe', 0)} serious)")
+    if stats.get("risky_crossings"):
+        facts.append(f"Unsignalised busy crossings: {stats['risky_crossings']}")
+    if stats.get("notice"):
+        facts.append("Note: " + stats["notice"])
+    facts += extra_facts or []
+    fig.text(0.56, 0.93, "\n".join(textwrap.shorten(f, 52 if qr_url else 60) for f in facts), fontsize=8.5,
              va="top", linespacing=1.6)
 
     prof = route.elevation_profile()
@@ -189,13 +229,25 @@ def _cue_table(fig, cues, top: float) -> None:
         fig.text(0.19, y + 0.005, textwrap.shorten(cue.instruction, 90), fontsize=8.5)
 
 
-def route_pdf(route: Route, stats: dict, title: str = "Cycle route",
-              basemap: str = "CyclOSM") -> bytes:
-    """Render a route to a multi-page A4 PDF and return its bytes."""
+def route_pdf(route: Route, stats: dict, title: str = "Cycle route", basemap: str = "CyclOSM",
+              layout: str = "standard", scale: float | None = None, qr_url: str | None = None,
+              extra_facts: list[str] | None = None) -> bytes:
+    """Render a route to PDF and return its bytes.
+
+    layout: "standard" (A4 overview map + details), "strip" (A4 overview + a
+    close-up strip map every few km for long rides), or "card" (A6 handlebar cue
+    card). scale: fixed paper scale, e.g. 10000 for 1:10,000 (default: fit route).
+    """
+    from cycleroutes.export import print_layouts
     tiles = TileManager(basemap)
     cues = cue_sheet(route)
     buf = io.BytesIO()
     with PdfPages(buf) as pdf:
-        _map_page(pdf, route, stats, title, tiles)
-        _details_page(pdf, route, stats, cues, title)
+        if layout == "card":
+            print_layouts.cue_card_pages(pdf, route, stats, cues, title, qr_url)
+        else:
+            _map_page(pdf, route, stats, title, tiles, scale)
+            if layout == "strip":
+                print_layouts.strip_pages(pdf, route, title, tiles, _draw_map)
+            _details_page(pdf, route, stats, cues, title, qr_url, extra_facts)
     return buf.getvalue()

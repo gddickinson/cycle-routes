@@ -2,7 +2,7 @@
 
 import logging
 import pickle
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import geopandas as gpd
@@ -22,6 +22,7 @@ class Region:
     radius_m: float
     graph: nx.MultiDiGraph
     features: gpd.GeoDataFrame
+    sources: dict = field(default_factory=dict)   # which extra open-data layers were applied
 
     @property
     def bbox(self) -> tuple[float, float, float, float]:
@@ -52,14 +53,20 @@ def build_region(name: str, lat: float, lon: float, radius_m: float) -> Region:
     route_ways = cycle_networks.fetch_cycle_route_ways(south, west, north, east)
 
     enrich.enrich(graph, features, grid, route_ways)
+    from cycleroutes.data.sources.apply import apply_all   # local import: avoids a cycle
+    apply_all(region)
     try:
         amenities.fetch_amenities(name, region.bbox)
     except RuntimeError as exc:
         logger.warning("Amenities unavailable: %s", exc)
-    with open(region_path(name), "wb") as fh:
-        pickle.dump(region, fh, protocol=pickle.HIGHEST_PROTOCOL)
-    logger.info("Region '%s' saved to %s", name, region_path(name))
+    save_region(region)
     return region
+
+
+def save_region(region: Region) -> None:
+    with open(region_path(region.name), "wb") as fh:
+        pickle.dump(region, fh, protocol=pickle.HIGHEST_PROTOCOL)
+    logger.info("Region '%s' saved to %s", region.name, region_path(region.name))
 
 
 def load_region(name: str) -> Region:
@@ -68,4 +75,7 @@ def load_region(name: str) -> Region:
         raise FileNotFoundError(
             f"Region '{name}' not built yet - run: python -m cycleroutes.cli build --name {name}")
     with open(path, "rb") as fh:
-        return pickle.load(fh)
+        region = pickle.load(fh)
+    if not hasattr(region, "sources"):   # pickles from before open-data sources existed
+        region.sources = {}
+    return region

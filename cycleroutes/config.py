@@ -31,6 +31,32 @@ COPERNICUS_DEM_URL = (
     "Copernicus_DSM_COG_10_{ns}{lat:02d}_00_{ew}{lon:03d}_00_DEM.tif"
 )
 
+# --- Extra open data sources (see cycleroutes/data/sources/) --------------------
+USGS_3DEP_URL = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
+DEM_3DEP_RES_M = 5.0          # bare-earth lidar DEM resampled to 5 m
+AUSTIN_SOCRATA = "https://data.austintexas.gov/resource"
+AUSTIN_CRASHES = "y2wy-tgr5"            # Vision Zero crash records (TxDOT CRIS)
+AUSTIN_BIKE_FACILITIES = "23hw-a95n"    # bike facilities + city "level of comfort"
+AUSTIN_COUNTER_FLOWS = "4mh3-39w2"      # active-transportation counter sites
+AUSTIN_COUNTER_COUNTS = "u4i6-pw3h"
+AUSTIN_WZDX_URL = "https://data.austintexas.gov/download/d9mm-cjw9"   # work zones (WZDx 4.x)
+AUSTIN_BBOX = (30.05, -98.10, 30.55, -97.50)                       # where the Austin sources apply
+TXDOT_AADT_URLS = [
+    "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_AADT_Annuals_(Public_View)/FeatureServer/0",
+    "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_5_Year_Statewide_AADT_Traffic_Counts/FeatureServer/0",
+]
+TEXAS_BBOX = (25.8, -106.7, 36.6, -93.5)
+CANOPY_TILE_URL = ("https://dataforgood-fb-data.s3.amazonaws.com/forests/v2/global/"
+                   "dinov3_global_chm_v2_ml3/chm/{quadkey}.tif")     # Meta/WRI 1 m canopy height
+CANOPY_TREE_M = 3.0           # canopy taller than this counts as shade
+NOISE_TILE_URL = ("https://tiles.arcgis.com/tiles/xOi1kZaI0eWDREZv/arcgis/rest/services/"
+                  "NTAD_Noise_2022_CONUS_aviation_road/MapServer")    # US DOT noise map
+OVERTURE_PLACES = ("s3://overturemaps-us-west-2/release/2026-09-23.1/theme=places/type=place/*")
+GBFS_URL = "https://austin.publicbikesystem.net/customer/gbfs/v3.0/gbfs.json"   # CapMetro Bikeshare
+OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+CRASH_YEARS = 7
+CRASH_RADIUS_M = 20.0
+
 # OSM way tags kept on graph edges (beyond osmnx defaults).
 EXTRA_WAY_TAGS = [
     "cycleway", "cycleway:left", "cycleway:right", "cycleway:both",
@@ -96,26 +122,33 @@ class Profile:
     traffic: float = 0.0
     hills: float = 0.0
     surface: float = 0.0
+    shade: float = 0.0
+    crossings: float = 1.0          # penalty for unsignalised crossings of busy roads
     time: bool = False              # base cost on travel time rather than distance
     lts_penalty: dict = field(default_factory=dict)  # {lts: multiplier}
 
     def weights(self) -> dict:
         return {"safety": self.safety, "fun": self.fun, "traffic": self.traffic,
-                "hills": self.hills, "surface": self.surface}
+                "hills": self.hills, "surface": self.surface, "shade": self.shade}
 
 
 PROFILES = {
-    "fastest": Profile("Fastest", "Quickest ride, whatever the roads", time=True),
+    "fastest": Profile("Fastest", "Quickest ride, whatever the roads", time=True, crossings=0.3),
     "safest": Profile("Safest", "Protected lanes and calm streets first",
-                      safety=4, traffic=1.5, lts_penalty={3: 2.0, 4: 6.0}),
+                      safety=4, traffic=1.5, crossings=3, lts_penalty={3: 2.0, 4: 6.0}),
     "family": Profile("Family", "Low-stress streets only, where possible",
-                      safety=5, traffic=2, hills=1, lts_penalty={3: 6.0, 4: 30.0}),
+                      safety=5, traffic=2, hills=1, crossings=4, lts_penalty={3: 6.0, 4: 30.0}),
     "scenic": Profile("Scenic & fun", "Parks, water, greenways and quiet lanes",
-                      fun=3, safety=1.5, traffic=1, lts_penalty={4: 3.0}),
+                      fun=3, safety=1.5, traffic=1, shade=1, crossings=1.5, lts_penalty={4: 3.0}),
     "flattest": Profile("Flattest", "Avoid climbing", hills=4, safety=1),
-    "quiet": Profile("Quietest", "Least motor traffic", traffic=4, safety=1),
+    "quiet": Profile("Quietest", "Least motor traffic and noise", traffic=4, safety=1, crossings=2),
+    "shady": Profile("Shadiest", "Most tree cover - for hot days", shade=4, safety=1.5, traffic=1,
+                     lts_penalty={4: 3.0}),
     "balanced": Profile("Balanced", "A bit of everything",
-                        safety=1.5, fun=1, traffic=1, hills=1, surface=0.5,
-                        lts_penalty={4: 2.0}),
+                        safety=1.5, fun=1, traffic=1, hills=1, surface=0.5, shade=0.5,
+                        crossings=1.5, lts_penalty={4: 2.0}),
 }
 DEFAULT_PROFILE = "balanced"
+CROSSING_COST_M = 80.0      # an unsignalised crossing of a busy road ~ 80 m of extra riding
+FAMILY_MAX_DETOUR = 1.8     # family route longer than this x fastest -> relax and warn
+HOT_APPARENT_C = 30.0       # feels-like temperature above which shade is sought
