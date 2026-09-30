@@ -41,9 +41,10 @@ export class RideController {
   // --- lifecycle ---------------------------------------------------------------
   async start(route = null) {
     if (this.active) await this.stop();
+    const mode = route?.mode || window.cycleRoutes?.app?.getMode?.() || "bike";
     const ride = await this.post("/api/rides", {
-      route_id: route?.id, source: this.source === "device" ? "phone" : this.source,
-      name: `${route ? route.title : "Ride"} · ${new Date().toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}` });
+      route_id: route?.id, mode, source: this.source === "device" ? "phone" : this.source,
+      name: `${route ? route.title : mode === "walk" ? "Walk" : "Ride"} · ${new Date().toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}` });
     Object.assign(this, { active: true, rideId: ride.id, route, buffer: [], lastFix: null,
       points: 0, startedAt: Date.now(), restart: true });
     this.showBanner();

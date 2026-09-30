@@ -39,12 +39,16 @@ class RideStore:
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA foreign_keys = ON")
         self._db.executescript(SCHEMA)
+        try:            # older databases: add the travel-mode column
+            self._db.execute("ALTER TABLE rides ADD COLUMN mode TEXT DEFAULT 'bike'")
+        except sqlite3.OperationalError:
+            pass
         self._lock = threading.Lock()
 
-    def start(self, name: str, source: str = "phone", route_id: str | None = None) -> int:
+    def start(self, name: str, source: str = "phone", route_id: str | None = None, mode: str = "bike") -> int:
         with self._lock, self._db:
-            cur = self._db.execute("INSERT INTO rides (name, started, source, route_id) VALUES (?,?,?,?)",
-                                   (name, time.time(), source, route_id))
+            cur = self._db.execute("INSERT INTO rides (name, started, source, route_id, mode) VALUES (?,?,?,?,?)",
+                                   (name, time.time(), source, route_id, mode))
             return int(cur.lastrowid)
 
     def add_fixes(self, ride_id: int, fixes: list[Fix]) -> int:

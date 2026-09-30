@@ -87,11 +87,12 @@ def iphone_tracker(payload: dict = Body(...)):
 # --- Ride recording ---------------------------------------------------------------
 @router.post("/api/rides")
 def start_ride(body: dict = Body(default={})):
-    name = body.get("name") or f"Ride {datetime.now():%Y-%m-%d %H:%M}"
+    name = body.get("name") or f"{'Walk' if body.get('mode') == 'walk' else 'Ride'} {datetime.now():%Y-%m-%d %H:%M}"
     s = state()
-    ride_id = s.rides.start(name, body.get("source", "phone"), body.get("route_id"))
-    if body.get("route_id") in s.routes:    # learn from the routes you actually choose to ride
-        route = s.routes[body["route_id"]][0]
+    route = s.routes[body["route_id"]][0] if body.get("route_id") in s.routes else None
+    mode = route.graph.graph.get("mode", "bike") if route else body.get("mode", "bike")
+    ride_id = s.rides.start(name, body.get("source", "phone"), body.get("route_id"), mode)
+    if route is not None and mode == "bike":    # learn from the routes you actually choose to ride
         prof = config.PROFILES.get(route.profile)
         if prof:
             s.community.record_choice(route.profile, prof.weights())
@@ -119,7 +120,12 @@ def _summarise(ride_id: int) -> tuple[dict, dict | None]:
     s = state()
     points = s.rides.points(ride_id)
     summary = track_stats(points)
-    matched, coverage = match_track(s.router, points)
+    mode = (s.rides.ride(ride_id) or {}).get("mode") or "bike"
+    try:
+        router = s.router_for(mode)
+    except HTTPException:
+        router = s.router
+    matched, coverage = match_track(router, points)
     summary["on_network_pct"] = round(100 * coverage, 1)
     payload = None
     if matched is not None:

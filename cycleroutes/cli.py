@@ -44,8 +44,13 @@ def _export(route, stats, title, args) -> None:
 
 
 def cmd_build(args) -> None:
+    from cycleroutes.data import settings
     from cycleroutes.data.region import build_region
-    build_region(args.name, args.lat, args.lon, args.radius)
+    if args.network or args.elevation:
+        settings.save(args.name, {k: v for k, v in (("network", args.network), ("elevation", args.elevation)) if v})
+    region = build_region(args.name, args.lat, args.lon, args.radius, refresh=args.refresh)
+    for name, result in region.sources.items():
+        print(f"{name:10s} {result}")
 
 
 def cmd_route(args) -> None:
@@ -102,6 +107,27 @@ def cmd_sources(args) -> None:
     save_region(region)
     for name, result in report.items():
         print(f"{name:10s} {result}")
+
+
+def cmd_walk(args) -> None:
+    """Build the walking network (and suggested walks) for an already-built area."""
+    from cycleroutes.data.walk_region import build_walk_region
+    from cycleroutes.routing.catalog import build_catalog
+    from cycleroutes.routing.router import Router
+    region = build_walk_region(args.region, refresh=args.refresh)
+    for name, result in region.sources.items():
+        print(f"{name:10s} {result}")
+    print(f"{len(build_catalog(region, Router(region.graph)))} suggested walks saved")
+
+
+def cmd_offline(args) -> None:
+    """Download the area's vector basemap so maps work without internet."""
+    from cycleroutes.data.region import load_region
+    from cycleroutes.offline.basemap import download_basemap
+    region = load_region(args.region)
+    info = download_basemap(region.name, region.bbox, args.max_zoom,
+                            lambda i, n: print(f"\r  {i}/{n} tiles", end="", flush=True))
+    print(f"\nOffline map: {info['tiles']} tiles, {info['bytes'] / 1e6:.1f} MB")
 
 
 def cmd_amenities(args) -> None:
@@ -171,6 +197,10 @@ def main(argv=None) -> None:
     b.add_argument("--lat", type=float, default=d["lat"])
     b.add_argument("--lon", type=float, default=d["lon"])
     b.add_argument("--radius", type=float, default=d["radius_m"], help="metres")
+    b.add_argument("--network", choices=["auto", "extract", "overpass"],
+                   help="where street data comes from (saved for this area; default auto)")
+    b.add_argument("--elevation", choices=["auto", "3dep", "copernicus"])
+    b.add_argument("--refresh", action="store_true", help="download everything again, even if already stored")
     b.set_defaults(func=cmd_build)
 
     for name, func, helptext in (("route", cmd_route, "A-to-B routes"),
@@ -216,6 +246,16 @@ def main(argv=None) -> None:
     so.add_argument("--refresh", action="store_true", help="download again instead of using the cache")
     so.add_argument("--only", help="comma list: elevation,canopy,noise,aadt,comfort,crashes,counters,stops")
     so.set_defaults(func=cmd_sources)
+
+    wk = sub.add_parser("walk", help="build walking routes for an area (after 'build')")
+    wk.add_argument("--region", default=d["name"])
+    wk.add_argument("--refresh", action="store_true")
+    wk.set_defaults(func=cmd_walk)
+
+    of = sub.add_parser("offline", help="download the area's map for offline use (stored locally)")
+    of.add_argument("--region", default=d["name"])
+    of.add_argument("--max-zoom", type=int, default=config.OFFLINE_MAX_ZOOM)
+    of.set_defaults(func=cmd_offline)
 
     am = sub.add_parser("amenities", help="(re)fetch bike shops, water, toilets, parking for a region")
     am.add_argument("--region", default=d["name"])

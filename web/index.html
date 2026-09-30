@@ -7,7 +7,7 @@
   <title>Cycle Routes</title>
   <link rel="manifest" href="/static/manifest.json">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -35,7 +35,11 @@
     <div class="panel-sticky">
     <button id="panel-handle" class="panel-handle" aria-label="Expand or collapse panel"></button>
     <header class="panel-head">
-      <h1>Cycle Routes</h1>
+      <div class="head-row"><h1>Cycle Routes</h1>
+        <div class="mode-switch" role="radiogroup" aria-label="Travel mode">
+          <button data-mode="bike" class="active" role="radio">🚲 Bike</button>
+          <button data-mode="walk" role="radio">🚶 Walk</button>
+        </div></div>
       <nav class="tabs" role="tablist">
         <button class="tab active" data-tab="ab" role="tab">A → B</button>
         <button class="tab" data-tab="loop" role="tab">Loop</button>
@@ -47,8 +51,8 @@
     <details id="settings" class="settings">
       <summary><span id="settings-summary">Riding now · hybrid</span></summary>
       <div class="settings-grid">
-        <label for="bike-type">Bike</label>
-        <select id="bike-type"></select>
+        <label for="bike-type" class="bike-only">Bike</label>
+        <select id="bike-type" class="bike-only"></select>
         <label for="depart">Leaving</label>
         <div class="search"><input id="depart" type="datetime-local">
           <button id="depart-now" class="icon-btn" title="Leave now">Now</button></div>
@@ -56,9 +60,15 @@
         <div class="checks">
           <label class="toggle"><input type="checkbox" id="use-weather" checked> Weather (wind, heat)</label>
           <label class="toggle"><input type="checkbox" id="use-closures" checked> Avoid closures</label>
+          <label class="toggle"><input type="checkbox" id="use-reports" checked> Rider reports</label>
         </div>
-        <span>Roads</span>
-        <label class="toggle strong"><input type="checkbox" id="infra-only"> Bike lanes, cycle paths &amp; trails only (where possible)</label>
+        <label for="score-data">Data</label>
+        <select id="score-data">
+          <option value="all">Score with all available data (crashes, traffic counts, city ratings…)</option>
+          <option value="osm">Score with OpenStreetMap only</option>
+        </select>
+        <span class="bike-only">Roads</span>
+        <label class="toggle strong bike-only"><input type="checkbox" id="infra-only"> Bike lanes, cycle paths &amp; trails only (where possible)</label>
         <span>Avoid</span>
         <div id="avoid-list" class="checks avoid-list"></div>
       </div>
@@ -102,6 +112,10 @@
         <label for="loop-profile">Style</label>
         <select id="loop-profile"></select>
       </div>
+      <div class="field walk-only" id="tour-field">
+        <label for="tour-stops">Sights to visit: <b id="tour-stops-val">6</b></label>
+        <input id="tour-stops" type="range" min="2" max="12" step="1" value="6">
+      </div>
       <button id="loop-go" class="btn primary">Generate loops</button>
     </section>
 
@@ -110,7 +124,7 @@
     </section>
 
     <section class="tab-body hidden" data-body="rides">
-      <button id="record-go" class="btn primary">● Record a ride</button>
+      <button id="record-go" class="btn primary">● Record a <span class="mode-noun">ride</span></button>
       <div class="row-btns">
         <button id="heatmap-go" class="btn secondary small">Show all my rides</button>
         <button id="favs-go" class="btn secondary small">Saved routes</button>
@@ -136,8 +150,19 @@
         <button id="region-build" class="btn secondary">Build area</button>
         <div id="region-job" class="facts"></div>
       </details>
+      <h3>Offline &amp; local data</h3>
+      <div id="offline-status" class="facts">Checking…</div>
+      <div class="row-btns wrap">
+        <button id="offline-download" class="btn small secondary">Download offline map</button>
+        <button id="offline-save" class="btn small secondary" disabled>Save map &amp; data on this device</button>
+      </div>
+      <div id="offline-progress" class="facts"></div>
+      <div class="row-btns wrap">
+        <a class="btn small secondary" href="/api/backup" download>Export my data</a>
+        <label class="btn small secondary file-btn">Import backup<input id="backup-file" type="file" accept="application/json" hidden></label>
+      </div>
       <h3>Data sources</h3>
-      <div id="sources" class="facts"></div>
+      <div id="sources" class="sources"></div>
       <p class="muted">Tip: press and hold (right-click) on the map to report a hazard, rate a street or save a place.</p>
     </section>
 
@@ -149,7 +174,8 @@
     </footer>
   </aside>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script src="/static/vendor/protomaps-leaflet.js"></script>
   <script type="module" src="/static/js/main.js"></script>
 </body>
 </html>

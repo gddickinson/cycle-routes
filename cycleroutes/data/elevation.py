@@ -40,6 +40,11 @@ class ElevationGrid:
         bot = d[r0 + 1, c0] * (1 - fc) + d[r0 + 1, c0 + 1] * fc
         return top * (1 - fr) + bot * fr
 
+    def covers(self, south: float, west: float, north: float, east: float) -> bool:
+        h, w = self.data.shape
+        return (self.west <= west and self.north >= north
+                and self.west + w * self.res_x >= east and self.north - h * self.res_y <= south)
+
     def save(self, path: Path) -> None:
         np.savez_compressed(path, data=self.data,
                             meta=np.array([self.west, self.north, self.res_x, self.res_y]))

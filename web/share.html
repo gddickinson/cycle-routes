@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Live Ride</title>
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
   <style>
     :root { --bg: #fff; --text: #1d2320; --muted: #5d6762; }
     @media (prefers-color-scheme: dark) { :root { --bg: #171b19; --text: #e7ece9; --muted: #9aa5a0; } }
@@ -20,7 +20,7 @@
 <body>
   <div id="map"></div>
   <div class="card"><h1 id="title">Live ride</h1><div id="info" class="muted">Loading…</div></div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
   <script>
     const token = location.pathname.split("/").pop();
     const map = L.map("map").setView([30.27, -97.74], 13);

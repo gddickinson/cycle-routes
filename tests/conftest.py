@@ -4,11 +4,17 @@ import geopandas as gpd
 import networkx as nx
 import numpy as np
 import pytest
+from fastapi.testclient import TestClient
+from PIL import Image
 from shapely.geometry import LineString
 
+from cycleroutes.api import app as app_mod
+from cycleroutes.api import live as live_mod
+from cycleroutes.api import state as state_mod
 from cycleroutes.data import enrich
 from cycleroutes.data.elevation import ElevationGrid
 from cycleroutes.data.region import Region
+from cycleroutes.export import tiles
 
 LAT0, LON0 = 30.0, -97.0
 STEP = 0.002  # ~200 m
@@ -83,3 +89,17 @@ def region() -> Region:
 def node_latlon(region: Region, r: int, c: int) -> tuple[float, float]:
     d = region.graph.nodes[r * N + c]
     return d["y"], d["x"]
+
+
+@pytest.fixture(scope="session")
+def client(region, tmp_path_factory):
+    mp = pytest.MonkeyPatch()
+    mp.setattr(state_mod, "load_region", lambda name: region)
+    mp.setattr(state_mod, "load_catalog", lambda r: [])
+    mp.setattr(live_mod.weather, "at", lambda *a: None)   # keep tests offline
+    mp.setattr(tiles.TileManager, "get_tile",
+               lambda self, x, y, z: Image.new("RGB", (256, 256), (230, 235, 230)))
+    state_mod.set_state(state_mod.AppState("test", rides_db=tmp_path_factory.mktemp("db") / "rides.sqlite"))
+    yield TestClient(app_mod.app)
+    state_mod.set_state(None)
+    mp.undo()

@@ -15,6 +15,17 @@ for **safety** (Level of Traffic Stress), **traffic**, **fun/scenery**, **hills*
   A4 PDF (map, legend, scale, km markers, ratings, elevation profile, cue sheet),
   GPX with elevation and turn cues for Garmin/Wahoo.
 
+## Walking
+Switch **🚲 Bike / 🚶 Walk** at the top. Walking uses its own network (sidewalks, footways,
+steps, pedestrian streets, shared paths) scored for people on foot: pedestrian stress
+(sidewalks, traffic, speed), pedestrian crash records, the city's sidewalk inventory and
+condition ratings, shade, noise, street life (cafés/shops) and nearby sights; walking time
+follows Tobler's hiking function. Trip types: **Commute, Urban adventure, Sightseeing, Hike,
+Green & quiet, Shady stroll, Step-free** (wheelchair/stroller: no steps, gentle slopes,
+smooth) and **Safest**. Loops, suggested walks, **sightseeing tours** (best sights nearby in a
+sensible order), navigation with voice, recording, printing and offline use all work on foot.
+Build it for an area with `cycleroutes walk` (after `cycleroutes build`).
+
 ## Riding context & planning
 - **Your ride, your conditions**: bike type (road, gravel, MTB, e-bike, cargo, kids), departure
   time (after dark → lit streets), live wind and heat (Open-Meteo → headwind and shade weighting),
@@ -38,7 +49,12 @@ for **safety** (Level of Traffic Stress), **traffic**, **fun/scenery**, **hills*
 - **Print**: overview map (auto or fixed 1:10k/1:25k scale), strip maps for long rides, A6
   handlebar cue card — each with a QR code to the GPX.
 - **More**: open-data map layers, the area's low-stress network score, build/switch areas.
-- **Offline**: installable app; visited map tiles and planned routes stay available offline.
+- **Offline & local data**: `cycleroutes offline` (or More › *Download offline map*) stores the
+  area's vector map on your computer (from the Protomaps OSM build - the public raster tile
+  servers forbid bulk downloads); *Save map & data on this device* puts the map, suggested rides,
+  layers and your data into the phone/browser so it works with no signal. *Export my data* /
+  *Import backup* move rides, places, saved routes and reports between machines as one JSON file.
+  Everything the server downloads lives in `data_cache/`.
 
 ## GPS riding & tracking
 - **Ride this route**: turn-by-turn banner with **voice guidance** (next turn, distance, remaining,
@@ -56,6 +72,17 @@ for **safety** (Level of Traffic Stress), **traffic**, **fun/scenery**, **hills*
 - `cycleroutes screenshots --out screenshots` — drives the app in headless Chrome (desktop, phone,
   dark mode, simulated GPS ride), saves numbered screenshots and PDF page renders, runs ~65 checks
   and writes `screenshots/report.html`. Exit code 1 if any check fails.
+
+## Choosing data sources
+More › **Data sources** (per area): where the street network comes from (a downloaded
+**BBBike extract**, read locally in about a minute, or the live **Overpass** servers), which
+**elevation** model to use (USGS 3DEP lidar or Copernicus), and which optional layers feed the
+scores (shade, noise, measured traffic, city comfort ratings, crashes, counters, places,
+amenities). **Use data already downloaded** reuses any stored download that covers the area
+(a new area inside an existing one is simply cut from it - no downloads at all); **Download
+fresh copies** refetches everything. Per route, ride settings can score with **all available
+data** or **OpenStreetMap only**, and switch rider reports, weather and closures on or off.
+From the command line: `cycleroutes build --network extract|overpass --elevation 3dep|copernicus [--refresh]`.
 
 ## Data sources (all open; applied where they have coverage)
 | What | Source | Coverage |
@@ -80,6 +107,7 @@ keys), TxDOT DriveTexas (keyed feed), Garmin/Wahoo (approved developer access).
 python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/cycleroutes build                     # default: central + north Austin, 6 km radius
 .venv/bin/cycleroutes sources                   # (re)apply extra open data to a built area
+.venv/bin/cycleroutes offline                   # store the area's map locally (works offline)
 .venv/bin/cycleroutes catalog                   # optional: suggested rides
 .venv/bin/cycleroutes serve                     # http://127.0.0.1:8000
 ```

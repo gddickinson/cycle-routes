@@ -31,9 +31,11 @@ class AppState:
     def __init__(self, region_name: str, rides_db: Path = config.RIDES_DB):
         self.region = load_region(region_name)
         self.router = Router(self.region.graph)
+        self._walk: tuple | None = None
         self.geocoder = NominatimGeocoder()
         self.routes: OrderedDict[str, tuple] = OrderedDict()
         self.navigators: dict[str, Navigator] = {}
+        self.rides_db_path = rides_db
         self.rides = RideStore(rides_db)
         self.community = CommunityStore(rides_db)
         self.live = LiveData(self.region, self.community)
@@ -42,6 +44,39 @@ class AppState:
         self.suggested = []
         for route, stats, title in load_catalog(self.region):
             self.suggested.append(self.store(route, stats, title))
+
+    # --- travel modes --------------------------------------------------------------
+    @property
+    def walk_available(self) -> bool:
+        from cycleroutes.data.region import region_path
+        from cycleroutes.data.walk_region import walk_name
+        return self._walk is not None or region_path(walk_name(self.region.name)).exists()
+
+    def walk(self):
+        """(walking Region, Router), loaded on first use."""
+        if self._walk is None:
+            from cycleroutes.data.walk_region import walk_name
+            if not self.walk_available:
+                raise HTTPException(404, "Walking routes aren't built for this area yet - "
+                                         "run: cycleroutes walk")
+            region = load_region(walk_name(self.region.name))
+            self._walk = (region, Router(region.graph))
+        return self._walk
+
+    def router_for(self, mode: str) -> Router:
+        if mode == "walk":
+            return self.walk()[1]
+        if mode != "bike":
+            raise HTTPException(400, "mode must be 'bike' or 'walk'")
+        return self.router
+
+    def region_for(self, mode: str):
+        return self.walk()[0] if mode == "walk" else self.region
+
+    @cached_property
+    def walk_suggested(self) -> list[dict]:
+        region, _ = self.walk()
+        return [self.store(route, stats, title) for route, stats, title in load_catalog(region)]
 
     def store(self, route, stats, title=None) -> dict:
         rid = uuid.uuid4().hex[:10]
@@ -64,6 +99,10 @@ class AppState:
     @cached_property
     def network(self) -> dict:
         return network_geojson(self.region.graph)
+
+    @cached_property
+    def walk_network(self) -> dict:
+        return network_geojson(self.walk()[0].graph)
 
     @cached_property
     def amenities(self) -> dict:

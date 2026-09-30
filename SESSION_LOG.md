@@ -95,3 +95,25 @@ engine (GraphHopper). Docker image written but not built (daemon not running).
   protected lanes are on major roads) -> protected lanes exempted. Fixed a race where a slow
   planning response drew routes after switching tab; SQLite reads now locked (intermittent 500).
 - Tests 53 passing; screenshot suite 45 screenshots / 93 checks passing.
+
+## 2026-09-30 — Bigger area, data-source options, reuse of downloads, offline map, walking
+- Area: 10 km radius around (30.28, -97.74). Overpass stalled (>25 min), so street data now comes
+  from the BBBike Austin extract (.osm.pbf, weekly) read locally with osmium using the same filters:
+  whole network in ~75 s. 138k cycling segments; 285k walking segments.
+- Data-source options: per area (streets extract/Overpass/auto, elevation 3DEP/Copernicus, each layer
+  on/off, reuse downloads) in More › Data sources with apply/rebuild jobs; per route "all data" vs
+  "OpenStreetMap only" scoring (precomputed OSM-only variants) and rider-reports switch.
+- Reuse: download cache keyed by covered area (clip on reuse, max ages per source); new areas inside
+  a built one are cut from it (5 s, scores kept); cycling and walking share downloads.
+- Offline: vector basemap from the Protomaps daily build into SQLite, served at /tiles; "save map &
+  data on this device" precaches it; data export/import; Leaflet + plugin bundled. Verified by
+  cutting the network in the screenshot run.
+- Walking: separate network (sidewalks, footways, steps…), pedestrian stress, pedestrian crashes
+  (1,569), city sidewalk inventory (46k with / 16k without), street life & sights, Tobler speed,
+  step-free; trip types commute/urban/sightseeing/hike/green/shady/step-free/safest; sightseeing
+  tours; suggested walks; walk navigation & recording.
+- Fixes along the way: stale per-name caches on rebuild, osmnx bbox order in extract reader,
+  inherited "downloaded now" labels, offline precache URL list, service-worker offline answers,
+  scenic matching 25 min → ~2 min (spatial index, identical results). A* tried and reverted
+  (identical routes, no speed-up).
+- Tests: 69 unit/API; screenshot suite 50 screenshots / 107 checks, all passing.

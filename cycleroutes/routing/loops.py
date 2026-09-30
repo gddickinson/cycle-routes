@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 PROFILE_RATING_KEY = {
     "safest": "safety", "family": "safety", "scenic": "fun", "flattest": "hills",
     "quiet": "traffic", "fastest": "speed", "shady": "shade", "trails": "fun", "mtb": "fun",
+    "commute": "speed", "urban": "fun", "tourist": "fun", "hike": "fun", "green": "fun", "accessible": "safety",
 }
 
 
@@ -30,7 +31,7 @@ def _loop_for_bearing(router: Router, start_node: int, bearing: float,
     if len({start_node, a, b}) < 3:
         raise RoutingError("Waypoints collapsed onto the start")
 
-    name, prof = resolve_profile(profile)
+    name, prof = resolve_profile(profile, router.mode)
     penalties: dict = {}
     edges = []
     for u, v in ((start_node, a), (a, b), (b, start_node)):

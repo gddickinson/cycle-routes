@@ -17,20 +17,23 @@ def _downsample_profile(route: Route) -> list[list[float]]:
     return [[round(d / 1000, 3), round(z, 1)] for d, z in pts]
 
 
-def profile_label(name: str) -> str:
+def profile_label(name: str, mode: str = "bike") -> str:
     if name == "ridden":
-        return "Your ride"
-    prof = config.PROFILES.get(name)
+        return "Your trip" if mode == "walk" else "Your ride"
+    prof = config.MODES.get(mode, config.PROFILES).get(name)
     return prof.label if prof else "Custom"
 
 
 def route_payload(route_id: str, route: Route, stats: dict, title: str | None = None) -> dict:
-    also = [profile_label(p) for p in route.meta.get("also_matches", [])]
+    mode = route.graph.graph.get("mode", "bike")
+    also = [profile_label(p, mode) for p in route.meta.get("also_matches", [])]
     return {
         "id": route_id,
-        "title": title or route.meta.get("title") or profile_label(route.profile),
+        "title": title or route.meta.get("title") or profile_label(route.profile, mode),
+        "mode": mode,
         "profile": route.profile,
-        "profile_label": profile_label(route.profile),
+        "profile_label": profile_label(route.profile, mode),
+        "tour": route.meta.get("tour"),
         "also_best_for": also,
         "kind": route.kind,
         "stats": stats,

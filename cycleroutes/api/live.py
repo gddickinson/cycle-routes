@@ -91,7 +91,7 @@ class LiveData:
         return dt if dt.tzinfo else dt.replace(tzinfo=self.now().tzinfo)
 
     def context(self, bike: str = "hybrid", depart: str | None = None, use_weather: bool = True,
-                use_closures: bool = True) -> tuple[RouteContext, dict]:
+                use_closures: bool = True, use_reports: bool = True) -> tuple[RouteContext, dict]:
         when = self.parse_depart(depart)
         lat, lon = self.region.lat, self.region.lon
         rise, sunset = sun_times(when.date(), lat, lon, when.tzinfo)
@@ -114,7 +114,8 @@ class LiveData:
             self.work_zones()
             ctx.closed, ctx.restricted = set(self._closed), set(self._restricted)
             info["closures"] = len(self._closed)
-        ctx.edge_multipliers = self.report_multipliers()
-        info["reports"] = len(self.community.hazards())
+        if use_reports:
+            ctx.edge_multipliers = self.report_multipliers()
+            info["reports"] = len(self.community.hazards())
         info["notes"] = ctx.describe()
         return ctx, info

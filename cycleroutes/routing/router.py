@@ -39,12 +39,15 @@ def make_cost(profile: Profile, penalties: dict | None = None, graph: nx.MultiDi
     nodes = graph.nodes if graph is not None else None
     hills_w = w["hills"] * (0.3 if ctx.bike == "ebike" else 1.0)
 
+    k_safety, k_quiet, k_fun, k_lts = (("safety_osm", "quiet_osm", "fun_osm", "lts_osm") if ctx.osm_only
+                                       else ("safety", "quiet", "fun", "lts"))
+
     def cost(d: dict, u: int | None = None, v: int | None = None) -> float:
         base = travel_time_s(d, ctx) * TIME_TO_METRES if profile.time else d["length"]
-        factor = (1 + w["safety"] * (1 - d["safety"]) + w["fun"] * (1 - d["fun"])
-                  + w["traffic"] * (1 - d["quiet"]) + w["surface"] * (1 - d["surface_q"])
-                  + w["shade"] * (1 - d.get("shade", 0.3)))
-        c = base * factor * profile.lts_penalty.get(d["lts"], 1.0) * d.get("awkward", 1.0)
+        factor = (1 + w["safety"] * (1 - d.get(k_safety, d["safety"])) + w["fun"] * (1 - d.get(k_fun, d["fun"]))
+                  + w["traffic"] * (1 - d.get(k_quiet, d["quiet"])) + w["surface"] * (1 - d["surface_q"])
+                  + w["shade"] * (0.0 if ctx.osm_only else 1 - d.get("shade", 0.3)))
+        c = base * factor * profile.lts_penalty.get(d.get(k_lts, d["lts"]), 1.0) * d.get("awkward", 1.0)
         c += hills_w * d.get("ascent", 0.0) * CLIMB_COST_M
         if u is not None:
             key = (min(u, v), max(u, v))
@@ -66,12 +69,13 @@ def custom_profile(**weights) -> Profile:
     return Profile("Custom", "Your own mix", **fields)
 
 
-def resolve_profile(name_or_profile) -> tuple[str, Profile]:
+def resolve_profile(name_or_profile, mode: str = "bike") -> tuple[str, Profile]:
     if isinstance(name_or_profile, Profile):
         return "custom", name_or_profile
-    if name_or_profile not in config.PROFILES:
-        raise RoutingError(f"Unknown profile '{name_or_profile}'")
-    return name_or_profile, config.PROFILES[name_or_profile]
+    profiles = config.MODES.get(mode, config.PROFILES)
+    if name_or_profile not in profiles:
+        raise RoutingError(f"Unknown {mode} profile '{name_or_profile}'")
+    return name_or_profile, profiles[name_or_profile]
 
 
 def shortest_nodes(graph, source: int, target: int, cost) -> list[int]:
@@ -89,6 +93,7 @@ class Router:
     def __init__(self, graph: nx.MultiDiGraph):
         self.graph = graph
         self.index = NodeIndex(graph)
+        self.mode = graph.graph.get("mode", "bike")
 
     def snap(self, lat: float, lon: float) -> int:
         node, dist = self.index.nearest(lat, lon)
@@ -98,13 +103,13 @@ class Router:
         return node
 
     def cost_for(self, profile, ctx: RouteContext | None = None, penalties: dict | None = None):
-        _, prof = resolve_profile(profile)
+        _, prof = resolve_profile(profile, self.mode)
         return make_cost(prof, penalties, self.graph, ctx)
 
     def route(self, start: tuple[float, float], end: tuple[float, float], profile="balanced",
               via: list[tuple[float, float]] | None = None, ctx: RouteContext | None = None) -> Route:
         """Route start -> (via points...) -> end."""
-        name, prof = resolve_profile(profile)
+        name, prof = resolve_profile(profile, self.mode)
         cost = make_cost(prof, None, self.graph, ctx)
         stops = [self.snap(*p) for p in [start, *(via or []), end]]
         stops = [n for i, n in enumerate(stops) if i == 0 or n != stops[i - 1]]
@@ -143,12 +148,12 @@ class Router:
         """One route per profile, dropping near-duplicates (the first one wins)."""
         routes: list[Route] = []
         fastest_m = None
-        for name in profiles or config.PROFILES:
+        for name in profiles or config.MODES[self.mode]:
             if name == "family":
                 r = self.family_route(start, end, via, ctx, fastest_m)
             else:
                 r = self.route(start, end, name, via, ctx)
-            if name == "fastest":
+            if name in ("fastest", "commute"):
                 fastest_m = r.length_m
             dup = next((o for o in routes if overlap(o, r) >= max_overlap), None)
             if dup:

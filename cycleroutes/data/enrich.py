@@ -3,6 +3,7 @@
 import logging
 
 import geopandas as gpd
+import pandas as pd
 import networkx as nx
 import numpy as np
 import osmnx as ox
@@ -14,6 +15,9 @@ from cycleroutes.routing.geo import bearing_deg
 from cycleroutes.scoring import edge_scores, lts, tags
 
 logger = logging.getLogger(__name__)
+
+# attributes that come from sources other than OpenStreetMap
+ENHANCED_ATTRS = ("city_lts", "city_facility", "aadt", "crashes", "crashes_severe", "noise_db", "shade")
 
 
 def _edge_geometries(graph: nx.MultiDiGraph) -> gpd.GeoDataFrame:
@@ -35,8 +39,15 @@ def add_scenic_fraction(graph: nx.MultiDiGraph, edges: gpd.GeoDataFrame,
         return
     edges_p = ox.projection.project_gdf(edges)
     feats_p = features.to_crs(edges_p.crs)
-    scenic_area = feats_p.geometry.buffer(config.SCENIC_BUFFER_M).union_all()
-    inside = edges_p.geometry.intersection(scenic_area).length
+    # Split the merged scenic area into its parts and index them, then intersect each
+    # edge only with the parts near it (far faster than one huge multipolygon).
+    area = feats_p.geometry.buffer(config.SCENIC_BUFFER_M).union_all()
+    parts = gpd.GeoDataFrame(geometry=list(getattr(area, "geoms", [area])), crs=edges_p.crs)
+    pairs = gpd.sjoin(edges_p[["geometry"]], parts, predicate="intersects", how="inner")
+    inside = pd.Series(0.0, index=edges_p.index)
+    for idx, right in pairs.groupby(level=[0, 1, 2])["index_right"]:
+        edge = edges_p.geometry.loc[idx]
+        inside.loc[idx] = sum(edge.intersection(parts.geometry.iloc[j]).length for j in right)
     frac = (inside / edges_p.geometry.length.clip(lower=1)).clip(0, 1)
     for idx, value in frac.items():
         graph.edges[idx]["scenic"] = float(value)
@@ -87,6 +98,12 @@ def add_scores(graph: nx.MultiDiGraph) -> None:
         data["surface_q"] = edge_scores.surface(data)
         data["fun"] = edge_scores.fun(data)
         data["time_s"] = edge_scores.travel_time_s(data)
+        # OpenStreetMap-only variants, so a route can be planned without the extra data
+        base = {k: v for k, v in data.items() if k not in ENHANCED_ATTRS}
+        base["lts"] = data["lts_osm"]
+        data["safety_osm"] = edge_scores.safety(base)
+        data["quiet_osm"] = edge_scores.quietness(base)
+        data["fun_osm"] = edge_scores.fun(base)
         data["awkward"] = edge_scores.awkwardness(data)
         if v in signals:
             data["time_s"] += config.TRAFFIC_SIGNAL_DELAY_S

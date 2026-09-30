@@ -12,13 +12,16 @@ from cycleroutes import config
 from cycleroutes.api.state import latlon as _latlon
 from cycleroutes.api.state import state
 from cycleroutes.api.community_api import router as community_router
+from cycleroutes.api.offline_api import router as offline_router
 from cycleroutes.api.planning_api import router as planning_router
+from cycleroutes.api.sources_api import router as sources_router
 from cycleroutes.api.tracking_api import router as tracking_router
 from cycleroutes.export.formats import to_gpx
 from cycleroutes.export.print_map import route_pdf
 from cycleroutes.routing.loops import generate_loops
+from cycleroutes.routing.tours import generate_tour
 from cycleroutes.routing.rating import rate
-from cycleroutes.routing.context import AVOID_TYPES, BIKE_TYPES
+from cycleroutes.routing.context import AVOID_TYPES, BIKE_AVOID, BIKE_TYPES, WALK_AVOID
 from cycleroutes.routing.router import RoutingError, custom_profile
 
 app = FastAPI(title="Cycle Routes prototype")
@@ -26,6 +29,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.include_router(tracking_router)
 app.include_router(planning_router)
 app.include_router(community_router)
+app.include_router(offline_router)
+app.include_router(sources_router)
 
 
 def _profile(profile: str, safety, fun, traffic, hills, surface, shade=0.0):
@@ -55,14 +60,18 @@ def region_info():
                      for k, p in config.PROFILES.items()},
         "lts_colors": config.LTS_COLORS, "lts_labels": config.LTS_LABELS,
         "bike_types": {k: b.label for k, b in BIKE_TYPES.items()},
-        "avoid_types": {k: label for k, (label, _) in AVOID_TYPES.items()},
+        "avoid_types": {k: AVOID_TYPES[k][0] for k in BIKE_AVOID},
+        "walk_available": s.walk_available,
+        "walk_profiles": {k: {"label": p.label, "description": p.description, **p.weights()}
+                          for k, p in config.WALK_PROFILES.items()},
+        "walk_avoid_types": {k: AVOID_TYPES[k][0] for k in WALK_AVOID},
         "sources": getattr(s.region, "sources", {}),
     }
 
 
 @app.get("/api/network")
-def network():
-    return state().network
+def network(mode: str = "bike"):
+    return state().walk_network if mode == "walk" else state().network
 
 
 def _via(via: str | None) -> list[tuple[float, float]]:
@@ -70,16 +79,21 @@ def _via(via: str | None) -> list[tuple[float, float]]:
 
 
 def _conditions(bike: str, depart: str | None, weather: bool, closures: bool,
-                avoid: str | None = None, infra_only: bool = False):
+                avoid: str | None = None, infra_only: bool = False, data: str = "all", reports: bool = True,
+                mode: str = "bike"):
     try:
-        ctx, info = state().live.context(bike, depart, weather, closures)
+        ctx, info = state().live.context(bike, depart, weather, closures, reports)
     except ValueError as exc:
         raise HTTPException(400, f"Bad departure time: {exc}") from exc
     keys = {k for k in (avoid or "").split(",") if k}
-    unknown = keys - set(AVOID_TYPES)
+    unknown = keys - set(WALK_AVOID if mode == "walk" else BIKE_AVOID)
     if unknown:
         raise HTTPException(400, f"Unknown avoid option(s): {', '.join(sorted(unknown))}")
-    ctx.avoid, ctx.infra_only = frozenset(keys), infra_only
+    if data not in ("all", "osm"):
+        raise HTTPException(400, "data must be 'all' or 'osm'")
+    ctx.avoid, ctx.infra_only, ctx.osm_only = frozenset(keys), infra_only and mode == "bike", data == "osm"
+    if mode == "walk":
+        ctx.bike = "hybrid"          # bike type doesn't apply on foot
     info["notes"] = ctx.describe()
     return ctx, info
 
@@ -91,28 +105,31 @@ def _store(r, stats, info, title=None) -> dict:
 @app.get("/api/alternatives")
 def alternatives(start: str, end: str, via: str | None = None, bike: str = "hybrid",
                  depart: str | None = None, weather: bool = True, closures: bool = True,
-                 avoid: str | None = None, infra_only: bool = False):
+                 avoid: str | None = None, infra_only: bool = False,
+                 data: str = "all", reports: bool = True, mode: str = "bike"):
     """Auto-generated options between two points (one per profile), each rated."""
     s = state()
-    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only)
-    routes = s.router.alternatives(_latlon(start), _latlon(end), via=_via(via), ctx=ctx)
+    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only, data, reports, mode)
+    routes = s.router_for(mode).alternatives(_latlon(start), _latlon(end), via=_via(via), ctx=ctx)
     fastest = min(r.time_s for r in routes)
     return [_store(r, rate(r, fastest_time_s=fastest), info) for r in routes]
 
 
 @app.get("/api/route")
-def route(start: str, end: str, profile: str = config.DEFAULT_PROFILE, via: str | None = None,
+def route(start: str, end: str, profile: str = "balanced", via: str | None = None,
           bike: str = "hybrid", depart: str | None = None, weather: bool = True, closures: bool = True,
-          avoid: str | None = None, infra_only: bool = False, safety: float = 0, fun: float = 0, traffic: float = 0, hills: float = 0,
+          avoid: str | None = None, infra_only: bool = False,
+                 data: str = "all", reports: bool = True, mode: str = "bike", safety: float = 0, fun: float = 0, traffic: float = 0, hills: float = 0,
           surface: float = 0, shade: float = 0):
     s = state()
-    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only)
+    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only, data, reports, mode)
     a, b, v = _latlon(start), _latlon(end), _via(via)
-    if profile == "family":
-        r = s.router.family_route(a, b, v, ctx)
+    rt = s.router_for(mode)
+    if profile == "family" and mode == "bike":
+        r = rt.family_route(a, b, v, ctx)
     else:
-        r = s.router.route(a, b, _profile(profile, safety, fun, traffic, hills, surface, shade), v, ctx)
-    fastest = s.router.route(a, b, "fastest", v, ctx).time_s
+        r = rt.route(a, b, _profile(profile, safety, fun, traffic, hills, surface, shade), v, ctx)
+    fastest = rt.route(a, b, "commute" if mode == "walk" else "fastest", v, ctx).time_s
     return _store(r, rate(r, fastest_time_s=fastest), info)
 
 
@@ -120,11 +137,12 @@ def route(start: str, end: str, profile: str = config.DEFAULT_PROFILE, via: str 
 def loop(start: str, km: float = Query(15, ge=2, le=100), profile: str = "scenic",
          count: int = Query(3, ge=1, le=5), bike: str = "hybrid", depart: str | None = None,
          weather: bool = True, closures: bool = True, avoid: str | None = None, infra_only: bool = False,
+                 data: str = "all", reports: bool = True, mode: str = "bike",
          safety: float = 0, fun: float = 0,
          traffic: float = 0, hills: float = 0, surface: float = 0, shade: float = 0):
     s = state()
-    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only)
-    loops = generate_loops(s.router, _latlon(start), km,
+    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only, data, reports, mode)
+    loops = generate_loops(s.router_for(mode), _latlon(start), km,
                            _profile(profile, safety, fun, traffic, hills, surface, shade), count, ctx)
     return [_store(r, stats, info, f"{r.length_m / 1000:.1f} km loop") for r, stats in loops]
 
@@ -135,8 +153,23 @@ def amenities():
 
 
 @app.get("/api/suggested")
-def suggested():
-    return state().suggested
+def suggested(mode: str = "bike"):
+    return state().walk_suggested if mode == "walk" else state().suggested
+
+
+@app.get("/api/tour")
+def tour(start: str, km: float = Query(5, ge=1, le=40), stops: int = Query(6, ge=2, le=12),
+         loop: bool = True, mode: str = "walk", profile: str = "tourist", depart: str | None = None,
+         weather: bool = True, closures: bool = True, avoid: str | None = None, data: str = "all",
+         reports: bool = True):
+    """Sightseeing tour through the best-rated sights near `start`."""
+    from cycleroutes.data.sources import overture
+    s = state()
+    ctx, info = _conditions("hybrid", depart, weather, closures, avoid, False, data, reports, mode)
+    rt = s.router_for(mode)
+    prof = profile if profile in config.MODES[mode] else ("tourist" if mode == "walk" else "scenic")
+    r, ordered = generate_tour(rt, _latlon(start), overture.load(s.region.name)["features"], km, stops, prof, loop, ctx)
+    return _store(r, rate(r), info, r.meta["title"])
 
 
 @app.get("/api/geocode")

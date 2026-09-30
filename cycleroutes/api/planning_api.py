@@ -62,12 +62,13 @@ def stages(rid: str, km_per_day: float = 60):
 
 
 @router.get("/api/layers/{name}")
-def layer(name: str):
+def layer(name: str, mode: str = "bike"):
     """Extra map layers from the open-data sources."""
     s = state()
     region = s.region.name
     if name == "crashes":
-        pts = austin.load_cached("crashes", region, [])
+        pts = austin.load_cached("pedcrashes" if mode == "walk" else "crashes",
+                                 region + ("--walk" if mode == "walk" else ""), [])
         return {"type": "FeatureCollection", "features": [
             {"type": "Feature", "geometry": {"type": "Point", "coordinates": [c["lon"], c["lat"]]},
              "properties": {k: c[k] for k in ("date", "severe", "fatal", "where")}} for c in pts]}
@@ -83,7 +84,7 @@ def layer(name: str):
     if name == "stops":
         return overture.load(region)
     if name == "trails":
-        return _trails_geojson(s.region)
+        return _trails_geojson(s.region_for(mode))
     if name == "hazards":
         return {"type": "FeatureCollection", "features": [
             {"type": "Feature", "geometry": {"type": "Point", "coordinates": [h["lon"], h["lat"]]},

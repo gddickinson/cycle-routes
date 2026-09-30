@@ -1,29 +1,9 @@
 """API tests against the synthetic region (PDF basemap tiles are stubbed)."""
 
 import pytest
-from fastapi.testclient import TestClient
-from PIL import Image
 
-from cycleroutes.api import app as app_mod
-from cycleroutes.api import live as live_mod
-from cycleroutes.api import state as state_mod
-from cycleroutes.export import tiles
 
 from conftest import node_latlon
-
-
-@pytest.fixture(scope="module")
-def client(region, tmp_path_factory):
-    mp = pytest.MonkeyPatch()
-    mp.setattr(state_mod, "load_region", lambda name: region)
-    mp.setattr(state_mod, "load_catalog", lambda r: [])
-    mp.setattr(live_mod.weather, "at", lambda *a: None)   # keep tests offline
-    mp.setattr(tiles.TileManager, "get_tile",
-               lambda self, x, y, z: Image.new("RGB", (256, 256), (230, 235, 230)))
-    state_mod.set_state(state_mod.AppState("test", rides_db=tmp_path_factory.mktemp("db") / "rides.sqlite"))
-    yield TestClient(app_mod.app)
-    state_mod.set_state(None)
-    mp.undo()
 
 
 def _ll(p):
@@ -104,3 +84,42 @@ def test_avoid_and_infra_params(client, region):
     assert "avoid_types" in client.get("/api/region").json()
     trails = client.get("/api/layers/trails").json()
     assert trails["features"] and "paved" in trails["features"][0]["properties"]
+
+
+def test_data_options_and_sources_api(client, region):
+    a, b = _ll(node_latlon(region, 2, 0)), _ll(node_latlon(region, 2, 5))
+    r = client.get(f"/api/route?start={a}&end={b}&data=osm&reports=false").json()
+    assert any("OpenStreetMap only" in n for n in r["conditions"]["notes"])
+    assert client.get(f"/api/route?start={a}&end={b}&data=bogus").status_code == 400
+    s = client.get("/api/sources").json()
+    assert s["network"]["options"]["overpass"] and s["layers"] and "downloads" in s
+    assert client.post("/api/sources", json={"settings": {"network": "nope"}}).status_code == 400
+    saved = client.post("/api/sources", json={"settings": {"layers": {"noise": False}}}).json()
+    assert saved["settings"]["layers"]["noise"] is False
+    from cycleroutes.data import settings as settings_mod
+    settings_mod.path("test").unlink(missing_ok=True)      # leave no settings for the fake area behind
+
+
+def test_walk_mode_api(client, region):
+    import copy
+    from cycleroutes.api import state as state_mod
+    from cycleroutes.routing.router import Router
+    from cycleroutes.scoring import walk_scores
+    g = copy.deepcopy(region.graph)
+    g.graph.update(mode="walk", base_kmh=4.8)
+    for _, _, d in g.edges(data=True):
+        walk_scores.score_edge(d)
+    walk = copy.copy(region)
+    walk.graph, walk.name = g, "test--walk"
+    st = state_mod.state()
+    st._walk = (walk, Router(g))
+    a, b = _ll(node_latlon(region, 0, 0)), _ll(node_latlon(region, 5, 5))
+    info = client.get("/api/region").json()
+    assert info["walk_available"] and "tourist" in info["walk_profiles"] and "no_sidewalk" in info["walk_avoid_types"]
+    alts = client.get(f"/api/alternatives?start={a}&end={b}&mode=walk").json()
+    assert alts and all(r["mode"] == "walk" for r in alts) and "sidewalk_pct" in alts[0]["stats"]
+    r = client.get(f"/api/route?start={a}&end={b}&mode=walk&profile=accessible&avoid=steps,no_sidewalk").json()
+    assert r["profile_label"] == "Step-free"
+    assert client.get(f"/api/route?start={a}&end={b}&mode=walk&avoid=major").status_code == 400
+    assert client.get(f"/api/loop?start={a}&km=2&mode=walk&profile=green&count=1").status_code == 200
+    assert client.get(f"/api/route?start={a}&end={b}&mode=boat").status_code == 400

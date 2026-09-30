@@ -15,8 +15,9 @@ function barColor(v) {
   return "#d1343a";
 }
 
-function ratingBars(ratings) {
-  return RATINGS.filter(([k]) => ratings[k] != null).map(([k, label]) => {
+function ratingBars(ratings, mode) {
+  return RATINGS.filter(([k]) => ratings[k] != null).map(([k, label0]) => {
+    const label = mode === "walk" ? ({ fun: "Pleasant", traffic: "Quiet", surface: "Paths & sidewalks" }[k] || label0) : label0;
     const v = ratings[k];
     return `<span>${label}</span><span class="bar"><i style="width:${v * 10}%;background:${barColor(v)}"></i></span><b>${v}</b>`;
   }).join("");
@@ -42,11 +43,28 @@ export function elevationSvg(points) {
     <div class="facts">${Math.round(Math.min(...zs))}–${Math.round(Math.max(...zs))} m elevation</div>`;
 }
 
+function walkFacts(s) {
+  if (s.mode !== "walk") return "";
+  const f = [`${s.sidewalk_pct}% on sidewalks or paths`];
+  if (s.no_sidewalk_pct) f.push(`⚠ ${s.no_sidewalk_pct}% on streets without sidewalks`);
+  f.push(`${s.accessible_pct}% step-free & gentle`);
+  if (s.steps) f.push(`${s.steps} flight${s.steps > 1 ? "s" : ""} of steps`);
+  if (s.lively_pct) f.push(`${s.lively_pct}% on lively streets`);
+  if (s.sights_pct) f.push(`${s.sights_pct}% past sights`);
+  if (s.ped_crashes) f.push(`${s.ped_crashes} pedestrian crash${s.ped_crashes > 1 ? "es" : ""} recorded on these streets`);
+  return `<div class="facts">${f.map(esc).join(" · ")}</div>`;
+}
+
+function tourList(r) {
+  if (!r.tour?.length) return "";
+  return `<ol class="tour-stops">${r.tour.map((t) => `<li><b>${esc(t.name)}</b> <small>${esc((t.kind || "").replace(/_/g, " "))}</small></li>`).join("")}</ol>`;
+}
+
 function dataFacts(s) {
   const f = [];
   if (s.avoided_km) f.push(`⚠ ${s.avoided_km} km on road types you chose to avoid (no alternative)`);
   if (s.trail_pct) f.push(`${s.trail_pct}% on trails${s.max_mtb_scale != null ? ` (MTB grade up to ${s.max_mtb_scale})` : ""}`);
-  if (s.crashes != null) f.push(`${s.crashes} recorded bike crash${s.crashes === 1 ? "" : "es"} on these streets${s.crashes_severe ? ` (${s.crashes_severe} serious)` : ""}`);
+  if (s.crashes != null && s.mode !== "walk") f.push(`${s.crashes} recorded bike crash${s.crashes === 1 ? "" : "es"} on these streets${s.crashes_severe ? ` (${s.crashes_severe} serious)` : ""}`);
   if (s.risky_crossings) f.push(`${s.risky_crossings} unsignalised crossing${s.risky_crossings > 1 ? "s" : ""} of busy roads`);
   if (s.busiest_aadt) f.push(`busiest road ≈${s.busiest_aadt.toLocaleString()} vehicles/day`);
   if (s.avg_noise_db) f.push(`average noise ${s.avg_noise_db} dB`);
@@ -58,12 +76,12 @@ function details(r, colors) {
   const routes = s.signed_routes.length ? `<div class="facts">Signed routes: ${s.signed_routes.map(esc).join(", ")}</div>` : "";
   const cues = r.cues.map((c) => `<li><span class="dot" style="background:${colors[c.lts]}"></span>
     <span class="km">${c.at_km.toFixed(2)} km</span><span>${esc(c.instruction)}</span></li>`).join("");
-  const ride = r.kind !== "ride" ? `<button class="btn small primary" data-act="ride">▶ Ride this route</button>` : "";
+  const ride = r.kind !== "ride" ? `<button class="btn small primary" data-act="ride">▶ ${r.mode === "walk" ? "Walk" : "Ride"} this route</button>` : "";
   return `<div class="details">
     ${elevationSvg(r.elevation)}
     <div class="facts">↑ ${s.ascent_m} m · ↓ ${s.descent_m} m · max ${s.max_grade_pct}% ·
       ${s.bike_infra_pct}% bike infrastructure · ${s.scenic_pct}% by parks/water</div>
-    ${dataFacts(s)}${routes}
+    ${tourList(r)}${walkFacts(s)}${dataFacts(s)}${routes}
     <div class="actions">${ride}
       <select class="print-select" data-act="print" aria-label="Print">
         <option value="">🖨 Print…</option><option value="standard">Overview map</option>
@@ -92,8 +110,8 @@ export function renderCards(container, routes, selectedId, colors, h) {
       <div class="card-sub">${s.distance_km} km · ~${Math.round(s.duration_min)} min ·
         ↑${s.ascent_m} m · ${s.hill_label}</div>
       ${notice}
-      <div>${also}${extra}<span class="tag">${s.signed_route_pct}% signed cycle route</span></div>
-      <div class="ratings">${ratingBars(s.ratings)}</div>
+      <div>${also}${extra}${r.mode === "walk" ? `<span class="tag">${s.sidewalk_pct}% sidewalks/paths</span>` : `<span class="tag">${s.signed_route_pct}% signed cycle route</span>`}</div>
+      <div class="ratings">${ratingBars(s.ratings, r.mode)}</div>
       <div class="stress-mix" title="Share of route at each traffic-stress level">${stressMix(s.lts_pct, colors)}</div>
       ${r.id === selectedId ? ctx + details(r, colors) : ""}
     </article>`;

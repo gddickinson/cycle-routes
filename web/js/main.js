@@ -9,7 +9,7 @@ import { RideController } from "./ride.js";
 import { renderRides, summaryHtml } from "./rides.js";
 import { attachSearch } from "./search.js";
 import { Settings, planLink, readLink } from "./settings.js";
-import { $, api, copyText, del, esc, fmt, post } from "./util.js";
+import { $, api, copyText, del, esc, fmt, post, recall, remember } from "./util.js";
 
 const SLIDERS = [["safety", "Safety", 3], ["fun", "Fun", 1], ["traffic", "Low traffic", 1],
   ["hills", "Avoid hills", 1], ["surface", "Smooth", 0.5], ["shade", "Shade", 0.5]];
@@ -17,7 +17,8 @@ const OUTSIDE_MSG = "That point is outside the mapped area (the shaded part of t
   + "Pick somewhere inside the dashed box, or build a bigger area under More.";
 const INPUTS = { start: "#start-input", end: "#end-input", loop: "#loop-input" };
 
-const state = { tab: "ab", start: null, end: null, loopStart: null, routes: [], selected: null };
+const state = { tab: "ab", start: null, end: null, loopStart: null, routes: [], selected: null,
+  mode: recall("mode", "bike") };
 const app = { state, api, post, setStatus };
 let region, rmap, rider, settings, plan;
 
@@ -118,6 +119,7 @@ app.loopFromMenu = (ll) => { switchTab("loop"); setPoint("loop", ll); };
 
 // --- Planning requests -------------------------------------------------------------------
 const pointsQuery = () => `start=${fmt(state.start)}&end=${fmt(state.end)}${plan.viaParam()}&${settings.query()}`;
+const profilesFor = (mode) => (mode === "walk" ? region.walk_profiles : region.profiles);
 const abRequest = (profile) => ({ start: state.start, end: state.end, via: plan.via, profile });
 
 function needPoints() {
@@ -147,6 +149,12 @@ function learnedRoute() {
 function generateLoops() {
   if (!state.loopStart) { setStatus("Choose a start point (tap the map or search)", true); return; }
   const km = $("#loop-km").value, profile = $("#loop-profile").value;
+  if (profile === "tour") {
+    const n = $("#tour-stops").value;
+    return run(`Planning a ${km} km tour of ${n} sights…`, async () =>
+      [await api(`/api/tour?start=${fmt(state.loopStart)}&km=${km}&stops=${n}&${settings.query()}`)],
+    { loop: state.loopStart, km, profile });
+  }
   run(`Generating ${km} km loops…`, () =>
     api(`/api/loop?start=${fmt(state.loopStart)}&km=${km}&profile=${profile}&count=3&${settings.query()}`),
   { loop: state.loopStart, km, profile });
@@ -232,12 +240,41 @@ function switchTab(tab, load = true) {
   if (tab === "more") app.more.load();
   if (tab === "suggested") {
     run("Loading suggested rides…", async () => {
-      const rides = await api("/api/suggested");
-      if (!rides.length) throw new Error("No suggested rides yet - run: cycleroutes catalog");
+      const rides = await api(`/api/suggested?mode=${state.mode}`);
+      if (!rides.length) throw new Error(`No suggested ${state.mode === "walk" ? "walks" : "rides"} yet - run: cycleroutes ${state.mode === "walk" ? "walk" : "catalog"}`);
       return rides.sort((a, b) => b.stats.ratings.overall - a.stats.ratings.overall);
     });
   }
 }
+
+function fillLoopProfiles() {
+  const profs = profilesFor(state.mode);
+  const def = state.mode === "walk" ? "green" : "scenic";
+  $("#loop-profile").innerHTML = Object.entries(profs)
+    .map(([k, p]) => `<option value="${k}" ${k === def ? "selected" : ""}>${esc(p.label)} — ${esc(p.description)}</option>`).join("")
+    + (state.mode === "walk" ? `<option value="tour">Sightseeing tour — visit the best sights nearby</option>` : "");
+  $("#tour-field").classList.add("hidden");
+}
+
+function setMode(mode) {
+  if (mode === "walk" && !region.walk_available) {
+    setStatus("Walking routes aren't built for this area yet - run: cycleroutes walk", true);
+    return;
+  }
+  state.mode = mode;
+  remember("mode", mode);
+  document.body.dataset.mode = mode;
+  document.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  document.querySelectorAll(".mode-noun").forEach((el) => { el.textContent = mode === "walk" ? "walk" : "ride"; });
+  $("[data-tab=rides]").textContent = mode === "walk" ? "Walks" : "Rides";
+  $("#loop-km").max = mode === "walk" ? 25 : 60;
+  if (mode === "walk" && +$("#loop-km").value > 10) { $("#loop-km").value = 5; $("#loop-km-val").textContent = 5; }
+  fillLoopProfiles();
+  settings.setMode(mode);
+  app.layers?.modeChanged();
+  switchTab(state.tab === "more" ? "more" : state.tab);
+}
+app.getMode = () => state.mode;
 
 async function loadGpsSources() {
   const sources = await api("/api/gps/sources").catch(() => []);
@@ -250,8 +287,10 @@ function buildControls() {
     `<label for="w-${k}">${label}</label><input id="w-${k}" type="range" min="0" max="5" step="0.5" value="${v}">
      <output id="o-${k}">${v}</output>`).join("");
   SLIDERS.forEach(([k]) => $(`#w-${k}`).addEventListener("input", (e) => { $(`#o-${k}`).textContent = e.target.value; }));
-  $("#loop-profile").innerHTML = Object.entries(region.profiles)
-    .map(([k, p]) => `<option value="${k}" ${k === "scenic" ? "selected" : ""}>${esc(p.label)} — ${esc(p.description)}</option>`).join("");
+  fillLoopProfiles();
+  $("#tour-stops").addEventListener("input", (e) => { $("#tour-stops-val").textContent = e.target.value; });
+  $("#loop-profile").addEventListener("change", () => $("#tour-field").classList.toggle("hidden", $("#loop-profile").value !== "tour"));
+  document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
   $("#loop-km").addEventListener("input", (e) => { $("#loop-km-val").textContent = e.target.value; });
   $("#legend").innerHTML = Object.entries(region.lts_labels)
     .map(([k, label]) => `<i style="background:${region.lts_colors[k]}"></i><span>${esc(label)}</span>`).join("");
@@ -303,6 +342,7 @@ async function init() {
   app.layers = new Layers(app);
   app.more = new More(app);
   buildControls();
+  if (state.mode === "walk" && region.walk_available) setMode("walk"); else { state.mode = "bike"; setMode("bike"); }
   loadGpsSources();
   window.cycleRoutes = { map: rmap.map, state, rider, app };  // debugging / automated UI checks
   setStatus("Tap the map to set a start, then an end. Press and hold for more options.");

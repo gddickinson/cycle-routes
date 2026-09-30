@@ -53,6 +53,8 @@ class ShotSession:
             self._problems.append(f"Missing file: {resp.url}")
 
     def _on_request_failed(self, req) -> None:
+        if self.page.context and getattr(self, "expect_offline", False):
+            return          # offline scenario: failed network requests are the point
         if "127.0.0.1" in req.url and "/api/" in req.url:
             self._problems.append(f"Request failed: {req.url} ({req.failure})")
 

@@ -21,6 +21,19 @@ def _weighted_default(route: Route, key: str, default: float) -> float:
     return float((lengths * vals).sum() / max(lengths.sum(), 1))
 
 
+def _walk_stats(route: Route, length: float) -> dict:
+    """Extra facts for walks: sidewalks, step-free share, street life, sights, steps."""
+    def share(pred):
+        return round(100 * sum(d["length"] for d in route.edge_data() if pred(d)) / max(length, 1), 1)
+    steps = sum(1 for d in route.edge_data() if tags.highway(d) == "steps")
+    return {"mode": "walk", "sidewalk_pct": share(lambda d: d.get("sidewalk") or tags.highway(d) in
+                                                   ("footway", "pedestrian", "path", "living_street")),
+            "no_sidewalk_pct": share(lambda d: d.get("sidewalk") is False),
+            "accessible_pct": share(lambda d: d.get("accessible")), "lively_pct": share(lambda d: d.get("lively", 0) >= 0.3),
+            "sights_pct": share(lambda d: d.get("sights")), "steps": steps,
+            "ped_crashes": sum(d.get("ped_crashes", 0) for d in route.edge_data())}
+
+
 def max_grade_pct(profile: list[tuple[float, float]]) -> float:
     """Steepest sustained climb (%) over runs of >= MIN_GRADE_RUN_M."""
     if len(profile) < 2:
@@ -80,10 +93,11 @@ def rate(route: Route, fastest_time_s: float | None = None) -> dict:
     climb_per_km = ascent / km
     avg_kmh = (length / 1000) / max(time_s / 3600, 1e-6)
 
+    base_kmh = route.graph.graph.get("base_kmh", config.BASE_CYCLING_SPEED_KMH)
     if fastest_time_s:
         speed = 10 * fastest_time_s / max(time_s, 1)
     else:
-        speed = (avg_kmh - 10) / (config.BASE_CYCLING_SPEED_KMH - 10) * 10
+        speed = (avg_kmh - base_kmh / 2) / (base_kmh / 2) * 10
 
     crashes = sum(d.get("crashes", 0) for d in route.edge_data())
     severe = sum(d.get("crashes_severe", 0) for d in route.edge_data())
@@ -132,6 +146,7 @@ def rate(route: Route, fastest_time_s: float | None = None) -> dict:
         "max_mtb_scale": max((d["mtb_scale"] for d in route.edge_data() if d.get("mtb_scale") is not None),
                              default=None),
         "avoided_km": round(avoided / 1000, 2) if ctx_avoid else None,
+        **(_walk_stats(route, length) if route.graph.graph.get("mode") == "walk" else {}),
         "crashes": crashes, "crashes_severe": severe, "risky_crossings": crossings,
         "measured_traffic_pct": round(100 * measured / max(length, 1), 1),
         "busiest_aadt": int(busiest) or None,

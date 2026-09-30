@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_DISTANCES_KM = (8, 15, 25)
 DEFAULT_PROFILES = ("scenic", "family", "balanced")
+WALK_DISTANCES_KM = (3, 5, 10)
+WALK_PROFILES = ("hike", "green", "urban")
 MAX_HUB_SNAP_M = 300
 
 
@@ -46,8 +48,10 @@ def pick_hubs(region: Region, max_parks: int = 4) -> list[dict]:
     return hubs
 
 
-def build_catalog(region: Region, router: Router, distances=DEFAULT_DISTANCES_KM,
-                  profiles=DEFAULT_PROFILES) -> list[dict]:
+def build_catalog(region: Region, router: Router, distances=None, profiles=None) -> list[dict]:
+    walk = router.mode == "walk"
+    distances = distances or (WALK_DISTANCES_KM if walk else DEFAULT_DISTANCES_KM)
+    profiles = profiles or (WALK_PROFILES if walk else DEFAULT_PROFILES)
     rides = []
     for hub in pick_hubs(region):
         for km in distances:
@@ -58,9 +62,9 @@ def build_catalog(region: Region, router: Router, distances=DEFAULT_DISTANCES_KM
                 except RoutingError as exc:
                     logger.info("No %s km %s loop from %s: %s", km, profile, hub["name"], exc)
                     continue
-                label = config.PROFILES[profile].label
+                label = config.MODES[router.mode][profile].label
                 rides.append({
-                    "title": f"{hub['name']}: {km} km {label.lower()} loop",
+                    "title": f"{hub['name']}: {km} km {label.lower()} {'walk' if walk else 'loop'}",
                     "hub": hub["name"], "profile": profile, "target_km": km,
                     "edges": [list(e) for e in loop.edges], "stats": stats,
                 })

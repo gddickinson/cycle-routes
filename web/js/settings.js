@@ -11,14 +11,16 @@ export class Settings {
     this.depart = null;              // null = leave now
     this.weather = recall("weather", true);
     this.closures = recall("closures", true);
+    this.mode = "bike";
     this.avoid = new Set(recall("avoid", []).filter((k) => k in (region.avoid_types || {})));
     this.infraOnly = recall("infraOnly", false);
-    $("#avoid-list").innerHTML = Object.entries(region.avoid_types || {}).map(([k, label]) =>
-      `<label class="toggle"><input type="checkbox" data-avoid="${k}" ${this.avoid.has(k) ? "checked" : ""}> ${esc(label)}</label>`).join("");
-    document.querySelectorAll("[data-avoid]").forEach((cb) => cb.addEventListener("change", () => {
-      if (cb.checked) this.avoid.add(cb.dataset.avoid); else this.avoid.delete(cb.dataset.avoid);
-      this.update({});
-    }));
+    this.scoreData = recall("scoreData", "all");
+    this.reports = recall("reports", true);
+    $("#score-data").value = this.scoreData;
+    $("#use-reports").checked = this.reports;
+    $("#score-data").addEventListener("change", (e) => this.update({ scoreData: e.target.value }));
+    $("#use-reports").addEventListener("change", (e) => this.update({ reports: e.target.checked }));
+    this.renderAvoid();
     $("#infra-only").checked = this.infraOnly;
     $("#infra-only").addEventListener("change", (e) => this.update({ infraOnly: e.target.checked }));
     this.info = null;
@@ -36,22 +38,44 @@ export class Settings {
     this.refreshConditions();
   }
 
+  renderAvoid() {
+    const types = (this.mode === "walk" ? this.region.walk_avoid_types : this.region.avoid_types) || {};
+    this.avoid = new Set([...this.avoid].filter((k) => k in types));
+    $("#avoid-list").innerHTML = Object.entries(types).map(([k, label]) =>
+      `<label class="toggle"><input type="checkbox" data-avoid="${k}" ${this.avoid.has(k) ? "checked" : ""}> ${esc(label)}</label>`).join("");
+    document.querySelectorAll("[data-avoid]").forEach((cb) => cb.addEventListener("change", () => {
+      if (cb.checked) this.avoid.add(cb.dataset.avoid); else this.avoid.delete(cb.dataset.avoid);
+      this.update({});
+    }));
+  }
+
+  setMode(mode) {
+    this.mode = mode;
+    this.avoid = new Set(recall(`avoid-${mode}`, []));
+    this.renderAvoid();
+    this.render();
+  }
+
   update(changes) {
     Object.assign(this, changes);
     remember("bike", this.bike);
     remember("weather", this.weather);
     remember("closures", this.closures);
-    remember("avoid", [...this.avoid]);
+    remember(`avoid-${this.mode}`, [...this.avoid]);
     remember("infraOnly", this.infraOnly);
+    remember("scoreData", this.scoreData);
+    remember("reports", this.reports);
     this.refreshConditions();
     this.onChange?.();
   }
 
   query() {
-    const q = new URLSearchParams({ bike: this.bike, weather: this.weather, closures: this.closures });
+    const q = new URLSearchParams({ bike: this.bike, weather: this.weather, closures: this.closures, mode: this.mode });
     if (this.depart) q.set("depart", this.depart);
     if (this.avoid.size) q.set("avoid", [...this.avoid].join(","));
     if (this.infraOnly) q.set("infra_only", "true");
+    if (this.scoreData !== "all") q.set("data", this.scoreData);
+    if (!this.reports) q.set("reports", "false");
     return q.toString();
   }
 
@@ -68,11 +92,12 @@ export class Settings {
     const i = this.info;
     const when = this.depart ? new Date(this.depart).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "now";
     const w = i?.weather;
-    const bits = [this.region.bike_types[this.bike] || "Hybrid", when];
+    const bits = [this.mode === "walk" ? "On foot" : (this.region.bike_types[this.bike] || "Hybrid"), when];
     if (w && this.weather) bits.push(`${Math.round(w.feels_c)}°C, wind ${w.wind_from} ${Math.round(w.wind_kmh)} km/h`);
     if (i?.dark) bits.push("🌙 dark");
-    if (this.infraOnly) bits.push("bike lanes only");
+    if (this.infraOnly && this.mode === "bike") bits.push("bike lanes only");
     if (this.avoid.size) bits.push(`avoiding ${this.avoid.size}`);
+    if (this.scoreData === "osm") bits.push("OSM data only");
     $("#settings-summary").textContent = bits.join(" · ");
     if (!i) { $("#conditions").textContent = "Conditions unavailable."; return; }
     const lines = [`Sunrise ${i.sunrise} · sunset ${i.sunset}${i.dark ? " · riding in the dark: lit streets preferred" : ""}`];

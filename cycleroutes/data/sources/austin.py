@@ -45,14 +45,15 @@ def _in_box(lat: float, lon: float, bbox) -> bool:
     return s <= lat <= n and w <= lon <= e
 
 
-def fetch_bike_crashes(bbox) -> list[dict]:
-    """Crashes involving a bicycle in the last CRASH_YEARS years, with severity."""
+def fetch_bike_crashes(bbox, mode: str = "bicycle") -> list[dict]:
+    """Crashes involving a bicycle (or mode="pedestrian") in the last CRASH_YEARS years."""
     since = (datetime.now() - timedelta(days=365 * config.CRASH_YEARS)).strftime("%Y-%m-%dT00:00:00")
     s, w, n, e = bbox
+    unit = "Pedestrian" if mode == "pedestrian" else "Bicycle"
     rows = _socrata(config.AUSTIN_CRASHES, {
-        "$select": "latitude,longitude,crash_timestamp_ct,crash_sev_id,units_involved,"
-                   "bicycle_death_count,bicycle_serious_injury_count,address_display",
-        "$where": f"units_involved like '%Bicycle%' AND crash_timestamp > '{since}' AND "
+        "$select": f"latitude,longitude,crash_timestamp_ct,crash_sev_id,units_involved,"
+                   f"{mode}_death_count,{mode}_serious_injury_count,address_display",
+        "$where": f"units_involved like '%{unit}%' AND crash_timestamp > '{since}' AND "
                   f"latitude between {s} and {n} AND longitude between {w} and {e}"})
     out = []
     for r in rows:
@@ -61,11 +62,48 @@ def fetch_bike_crashes(bbox) -> list[dict]:
         except (KeyError, TypeError, ValueError):
             continue
         out.append({"lat": lat, "lon": lon, "date": r.get("crash_timestamp_ct", "")[:10],
-                    "severe": int(r.get("bicycle_death_count") or 0) + int(r.get("bicycle_serious_injury_count") or 0) > 0,
-                    "fatal": int(r.get("bicycle_death_count") or 0) > 0,
+                    "severe": int(r.get(f"{mode}_death_count") or 0) + int(r.get(f"{mode}_serious_injury_count") or 0) > 0,
+                    "fatal": int(r.get(f"{mode}_death_count") or 0) > 0,
                     "where": r.get("address_display", "")})
-    logger.info("Austin bike crashes: %d (%d severe)", len(out), sum(c["severe"] for c in out))
+    logger.info("Austin %s crashes: %d (%d severe)", mode, len(out), sum(c["severe"] for c in out))
     return out
+
+
+def fetch_ped_crashes(bbox) -> list[dict]:
+    return fetch_bike_crashes(bbox, mode="pedestrian")
+
+
+SIDEWALK_EXISTS = {"EXISTING_SIDEWALK", "SHARED_USE_PATH", "SHARED_STREET", "PROTECTED_STREET_PATH"}
+SIDEWALK_MISSING = {"POTENTIAL_SIDEWALK", "PLANNED_SIDEWALK"}
+
+
+def fetch_sidewalks(bbox) -> dict:
+    """City sidewalk inventory: existing sidewalks (with condition 1 good..5 poor) and missing ones."""
+    s, w, n, e = bbox
+    feats, offset = [], 0
+    while True:
+        resp = requests.get(f"{config.AUSTIN_SOCRATA}/{config.AUSTIN_SIDEWALKS}.geojson", timeout=180,
+                            headers={"User-Agent": config.USER_AGENT}, params={
+                                "$select": "the_geom,pedestrian_facility_type,rating_overall,width_sidewalk",
+                                "$where": f"within_box(the_geom, {n}, {w}, {s}, {e}) AND "
+                                          "pedestrian_facility_type != 'DRIVEWAY'",
+                                "$limit": 20000, "$offset": offset})
+        resp.raise_for_status()
+        page = resp.json().get("features", [])
+        for f in page:
+            p, g = f.get("properties") or {}, f.get("geometry")
+            kind = p.get("pedestrian_facility_type")
+            if not g or kind not in SIDEWALK_EXISTS | SIDEWALK_MISSING:
+                continue
+            rating = p.get("rating_overall")
+            feats.append({"type": "Feature", "geometry": g, "properties": {
+                "exists": kind in SIDEWALK_EXISTS, "kind": kind,
+                "rating": int(rating) if rating and str(rating).isdigit() else None}})
+        if len(page) < 20000:
+            break
+        offset += 20000
+    logger.info("Austin sidewalk segments: %d (%d missing)", len(feats), sum(not f["properties"]["exists"] for f in feats))
+    return {"type": "FeatureCollection", "features": feats}
 
 
 def fetch_bike_facilities(bbox) -> dict:

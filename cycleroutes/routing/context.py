@@ -69,6 +69,13 @@ AVOID_TYPES = {
     "service": ("Service roads & parking lots", lambda e: tags.highway(e) == "service"),
     "trails": ("Off-road trails", lambda e: e.get("trail", False)),
 }
+# walking avoid options (the router applies whichever set the request uses)
+AVOID_TYPES.update({
+    "no_sidewalk": ("Streets without sidewalks", lambda e: e.get("sidewalk") is False),
+    "hiking": ("Demanding hiking trails", lambda e: tags.first(e, "sac_scale") not in ("", "hiking")),
+})
+WALK_AVOID = ("busy", "stressful", "no_sidewalk", "unpaved", "steps", "trails", "hiking")
+BIKE_AVOID = ("major", "secondary", "busy", "stressful", "unpaved", "steps", "sidewalks", "service", "trails")
 
 
 @dataclass
@@ -84,6 +91,7 @@ class RouteContext:
     avoid: frozenset = frozenset()        # keys of AVOID_TYPES
     infra_only: bool = False              # bike lanes, cycle paths & trails only (where possible)
     prefer: str = ""                      # set from the profile: "trails" / "mtb"
+    osm_only: bool = False                # score with OpenStreetMap only (ignore the extra data)
 
     @property
     def bike_type(self) -> BikeType:
@@ -106,6 +114,8 @@ class RouteContext:
                                                  for k in sorted(self.avoid) if k in AVOID_TYPES))
         if self.infra_only:
             notes.append("bike lanes & trails only where possible")
+        if self.osm_only:
+            notes.append("scored with OpenStreetMap only")
         return notes
 
     def avoided(self, edge: dict) -> bool:
@@ -169,6 +179,14 @@ def edge_multiplier(edge: dict, key: tuple, ctx: RouteContext, safety_weight: fl
         m *= config.INFRA_ONLY_PENALTY
     if ctx.prefer == "trails" and not edge.get("trail", False):
         m *= config.PREFER_PENALTY["trails"]
+    elif ctx.prefer == "lively":
+        m *= 1.0 if edge.get("lively", 0.0) >= 0.3 else config.PREFER_PENALTY["lively"]
+    elif ctx.prefer == "sights":
+        m *= 0.7 if edge.get("sights") else config.PREFER_PENALTY["sights"]
+    elif ctx.prefer == "nature":
+        m *= 1.0 if edge.get("scenic", 0.0) >= 0.3 else config.PREFER_PENALTY["nature"]
+    elif ctx.prefer == "accessible" and not edge.get("accessible", True):
+        m *= config.PREFER_PENALTY["accessible"]
     elif ctx.prefer == "mtb":
         rough_trail = edge.get("trail", False) and (edge.get("mtb_scale") is not None or surf < 0.6)
         m *= 0.8 if rough_trail else (1.0 if edge.get("trail", False) else config.PREFER_PENALTY["mtb"])

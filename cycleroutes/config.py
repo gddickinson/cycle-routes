@@ -14,7 +14,8 @@ WEB_DIR = PROJECT_ROOT / "web"
 USER_AGENT = "CycleRoutes-prototype/0.1 (+https://github.com/gddickinson/cycle-routes)"
 
 # Default demo region: central Austin, TX (the pyNav default map centre).
-DEFAULT_REGION = {"name": "austin", "lat": 30.2900, "lon": -97.7400, "radius_m": 6000}
+DEFAULT_REGION = {"name": "austin", "lat": 30.2800, "lon": -97.7400, "radius_m": 10000}
+OVERPASS_MAX_QUERY_AREA_M2 = 6e7   # split big downloads into ~7.7 km squares (public servers time out)
 
 # --- Data sources -------------------------------------------------------------
 # Overpass endpoints tried in order (public servers are often busy).
@@ -31,6 +32,14 @@ COPERNICUS_DEM_URL = (
     "Copernicus_DSM_COG_10_{ns}{lat:02d}_00_{ew}{lon:03d}_00_DEM.tif"
 )
 
+# Downloadable OpenStreetMap extracts (build from a file instead of the Overpass API).
+# bbox = (south, west, north, east) coverage; add entries for other cities.
+EXTRACTS = {
+    "bbbike-austin": {"provider": "BBBike", "name": "Austin",
+                      "url": "https://download.bbbike.org/osm/bbbike/Austin/Austin.osm.pbf",
+                      "bbox": (30.10, -97.99, 30.71, -97.54), "updated": "weekly"},
+}
+
 # --- Extra open data sources (see cycleroutes/data/sources/) --------------------
 USGS_3DEP_URL = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
 DEM_3DEP_RES_M = 5.0          # bare-earth lidar DEM resampled to 5 m
@@ -39,6 +48,7 @@ AUSTIN_CRASHES = "y2wy-tgr5"            # Vision Zero crash records (TxDOT CRIS)
 AUSTIN_BIKE_FACILITIES = "23hw-a95n"    # bike facilities + city "level of comfort"
 AUSTIN_COUNTER_FLOWS = "4mh3-39w2"      # active-transportation counter sites
 AUSTIN_COUNTER_COUNTS = "u4i6-pw3h"
+AUSTIN_SIDEWALKS = "vchz-d9ng"          # sidewalk inventory with condition ratings
 AUSTIN_WZDX_URL = "https://data.austintexas.gov/download/d9mm-cjw9"   # work zones (WZDx 4.x)
 AUSTIN_BBOX = (30.05, -98.10, 30.55, -97.50)                       # where the Austin sources apply
 TXDOT_AADT_URLS = [
@@ -54,6 +64,9 @@ NOISE_TILE_URL = ("https://tiles.arcgis.com/tiles/xOi1kZaI0eWDREZv/arcgis/rest/s
 OVERTURE_PLACES = ("s3://overturemaps-us-west-2/release/2026-09-23.1/theme=places/type=place/*")
 GBFS_URL = "https://austin.publicbikesystem.net/customer/gbfs/v3.0/gbfs.json"   # CapMetro Bikeshare
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+PROTOMAPS_BUILDS_URL = "https://build-metadata.protomaps.dev/builds.json"
+PROTOMAPS_BUILD_URL = "https://build.protomaps.com/{key}"   # daily OSM vector build (ODbL)
+OFFLINE_MAX_ZOOM = 15      # deepest vector zoom; the map over-zooms beyond it
 CRASH_YEARS = 7
 CRASH_RADIUS_M = 20.0
 
@@ -64,6 +77,16 @@ EXTRA_WAY_TAGS = [
     "bridge", "tunnel", "oneway:bicycle", "sidewalk",
     "mtb:scale", "footway", "foot", "trail_visibility",
 ]
+
+# Walking network: osmnx "walk" filter plus shared-use paths tagged as cycleways that allow
+# pedestrians, and pedestrian areas' edges. Tags useful for walking are kept too.
+WALK_EXTRA_FILTERS = [
+    '["highway"="cycleway"]["foot"~"yes|designated|permissive"]["access"!~"private|no"]',
+]
+WALK_EXTRA_TAGS = ["sac_scale", "wheelchair", "incline", "crossing", "tactile_paving", "kerb",
+                   "trail_visibility", "sidewalk:left", "sidewalk:right", "sidewalk:both"]
+WALK_BASE_KMH = 4.8
+TOBLER_FLAT_KMH = 5.0
 
 # Extra ways added to the osmnx "bike" network: trails that allow bikes but are tagged
 # as footways (common for greenbelt trails), and anything with a mountain-bike grade.
@@ -163,9 +186,33 @@ PROFILES = {
                         crossings=1.5, lts_penalty={4: 2.0}),
 }
 DEFAULT_PROFILE = "balanced"
+
+# Walking trip types (same Profile fields; "lts" on a walking graph is pedestrian stress).
+WALK_PROFILES = {
+    "commute": Profile("Commute", "Direct and safe - the sensible way to work", time=True, safety=1.5,
+                       crossings=2, lts_penalty={4: 3.0}),
+    "urban": Profile("Urban adventure", "Lively streets, cafés, shops and street life",
+                     fun=2, safety=1, crossings=1.5, prefer="lively", lts_penalty={4: 3.0}),
+    "tourist": Profile("Sightseeing", "Past landmarks, museums, parks and viewpoints",
+                       fun=2, safety=1, crossings=1.5, prefer="sights", lts_penalty={4: 3.0}),
+    "hike": Profile("Hike", "Trails and nature; hills welcome", fun=2, prefer="trails",
+                    lts_penalty={3: 2.0, 4: 6.0}),
+    "green": Profile("Green & quiet", "Parks, water and quiet streets", fun=2, traffic=3, safety=1,
+                     prefer="nature", crossings=2, lts_penalty={3: 2.0, 4: 6.0}),
+    "shady": Profile("Shady stroll", "Most tree cover - for hot days", shade=4, safety=1, traffic=1,
+                     lts_penalty={4: 3.0}),
+    "accessible": Profile("Step-free", "Wheelchair & stroller friendly: no steps, gentle slopes, smooth",
+                          hills=3, safety=2, surface=3, crossings=3, prefer="accessible", lts_penalty={4: 3.0}),
+    "safest": Profile("Safest", "Sidewalks, low traffic, safe crossings", safety=4, traffic=2, crossings=4,
+                      lts_penalty={3: 3.0, 4: 10.0}),
+    "balanced": Profile("Balanced", "A bit of everything", safety=1.5, fun=1.5, traffic=1, hills=0.5,
+                        shade=0.5, crossings=1.5, lts_penalty={4: 2.0}),
+}
+DEFAULT_WALK_PROFILE = "balanced"
+MODES = {"bike": PROFILES, "walk": WALK_PROFILES}
 AVOID_PENALTY = 40.0        # "avoid" road types: 40x cost - used only when nothing else connects
 INFRA_ONLY_PENALTY = 5.0    # "bike lanes & trails only": streets without bike space cost 5x
-PREFER_PENALTY = {"trails": 3.0, "mtb": 4.0}   # cost multiplier for ways that aren't what the profile seeks
+PREFER_PENALTY = {"trails": 3.0, "mtb": 4.0, "lively": 1.8, "sights": 1.8, "nature": 2.5, "accessible": 50.0}   # cost multiplier for ways that aren't what the profile seeks
 CROSSING_COST_M = 80.0      # an unsignalised crossing of a busy road ~ 80 m of extra riding
 FAMILY_MAX_DETOUR = 1.8     # family route longer than this x fastest -> relax and warn
 HOT_APPARENT_C = 30.0       # feels-like temperature above which shade is sought

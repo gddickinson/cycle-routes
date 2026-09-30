@@ -15,9 +15,9 @@ export class RouteMap {
     const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19, attribution: "© OpenStreetMap contributors",
     });
-    cyclosm.addTo(this.map);
-    L.control.layers({ "Cycle map (CyclOSM)": cyclosm, "OpenStreetMap": osm }, null,
-      { position: "topright" }).addTo(this.map);
+    this.baseLayers = { "Cycle map (CyclOSM)": cyclosm, "OpenStreetMap": osm };
+    (navigator.onLine ? cyclosm : osm).addTo(this.map);
+    this.layerControl = L.control.layers(this.baseLayers, null, { position: "topright" }).addTo(this.map);
     const [s, w, n, e] = region.bbox;
     this.bounds = L.latLngBounds([[s, w], [n, e]]);
     // Grey out everything outside the mapped area (a world-sized polygon with the region as a hole).
@@ -35,6 +35,18 @@ export class RouteMap {
 
   color(lts) { return this.region.lts_colors[lts]; }
 
+  /** Add the locally stored vector basemap; switch to it when offline (or when asked). */
+  addOfflineBasemap(info, select = !navigator.onLine) {
+    if (this.offlineLayer || !window.protomapsL) return;
+    this.offlineLayer = window.protomapsL.leafletLayer({ url: "/tiles/{z}/{x}/{y}.mvt", flavor: "light",
+      maxDataZoom: info.max_zoom || 15, attribution: info.attribution });
+    this.layerControl.addBaseLayer(this.offlineLayer, "Offline map (stored locally)");
+    if (select) {
+      Object.values(this.baseLayers).forEach((l) => this.map.removeLayer(l));
+      this.offlineLayer.addTo(this.map);
+    }
+  }
+
   inRegion(latlon) { return this.bounds.contains(latlon); }
 
   setPin(name, latlon, label, color, onMove) {
@@ -51,9 +63,12 @@ export class RouteMap {
 
   async toggleStress(on) {
     if (!on) { if (this.stress) this.stress.remove(); return; }
-    if (!this.stressData) {
-      const res = await fetch("/api/network");
+    const mode = window.cycleRoutes?.app?.getMode?.() || "bike";
+    if (!this.stressData || this.stressMode !== mode) {
+      const res = await fetch(`/api/network?mode=${mode}`);
       this.stressData = await res.json();
+      this.stressMode = mode;
+      if (this.stress) this.stress.remove();
     }
     this.stress = L.geoJSON(this.stressData, {
       renderer: this.renderer, interactive: false,
@@ -78,6 +93,8 @@ export class RouteMap {
       }
     }
     const sel = routes.find((r) => r.id === selectedId);
+    (sel?.tour || []).forEach((t, i) => L.marker([t.lat, t.lon], { icon: L.divIcon({ className: "", iconSize: [24, 24],
+      html: `<div class="pin tour-pin">${i + 1}</div>` }) }).bindTooltip(t.name).addTo(this.routeLayer));
     if (sel) {
       const halo = L.geoJSON(sel.geojson, { renderer: this.renderer, interactive: false,
         style: { color: "#fff", weight: 9, opacity: 0.95 } }).addTo(this.routeLayer);

@@ -18,9 +18,11 @@ def _configure_osmnx() -> None:
     ox.settings.log_console = False
     ox.settings.http_user_agent = config.USER_AGENT
     ox.settings.requests_timeout = 300
+    ox.settings.max_query_area_size = config.OVERPASS_MAX_QUERY_AREA_M2
     ox.settings.overpass_rate_limit = False  # its slot-wait can hang on mirrors; we retry ourselves
     tags = list(ox.settings.useful_tags_way)
-    ox.settings.useful_tags_way = tags + [t for t in config.EXTRA_WAY_TAGS if t not in tags]
+    extra = config.EXTRA_WAY_TAGS + config.WALK_EXTRA_TAGS
+    ox.settings.useful_tags_way = tags + [t for t in extra if t not in tags]
     node_tags = list(ox.settings.useful_tags_node)
     if "highway" not in node_tags:
         ox.settings.useful_tags_node = node_tags + ["highway"]

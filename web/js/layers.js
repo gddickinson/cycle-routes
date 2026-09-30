@@ -51,14 +51,19 @@ export class Layers {
     if (this.active[name]) { this.active[name].remove(); delete this.active[name]; }
     if (!on) return;
     try {
-      this.data[name] = await api(`/api/layers/${name}`);
+      this.data[name] = await api(`/api/layers/${name}?mode=${this.app.getMode()}`);
     } catch (err) { this.app.setStatus(err.message, true); return; }
     this.draw(name);
   }
 
+  modeChanged() {
+    ["crashes", "trails"].forEach((n) => { if (this.active[n]) this.toggle(n, true); });
+    if (document.querySelector("[data-layer=stress]")?.checked) this.app.rmap.toggleStress(true);
+  }
+
   async reload(name) {
     if (!this.active[name]) return;
-    this.data[name] = await api(`/api/layers/${name}`);
+    this.data[name] = await api(`/api/layers/${name}?mode=${this.app.getMode()}`);
     this.draw(name);
   }
 
