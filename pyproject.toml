@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cycleroutes"
+version = "0.1.0"
+description = "Prototype: automatically generated, rated cycling routes (safety, fun, hills, speed, traffic)"
+requires-python = ">=3.11"
+dependencies = [
+    "osmnx>=2.0", "networkx>=3.2", "geopandas>=1.0", "shapely>=2.0",
+    "rasterio>=1.4", "numpy", "requests", "pillow", "matplotlib>=3.8",
+    "fastapi>=0.110", "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+gps = ["pyserial>=3.5"]
+dev = ["pytest", "httpx", "playwright", "pymupdf"]
+
+[project.scripts]
+cycleroutes = "cycleroutes.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["cycleroutes*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

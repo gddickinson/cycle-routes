@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a7f37">
+  <title>Cycle Routes</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="nav" class="nav hidden" role="status" aria-live="polite">
+    <div class="nav-main">
+      <div id="nav-arrow" class="nav-arrow">↑</div>
+      <div class="nav-text">
+        <div id="nav-dist" class="nav-dist"></div>
+        <div id="nav-instr" class="nav-instr">Waiting for GPS…</div>
+      </div>
+    </div>
+    <div id="nav-meta" class="nav-meta"></div>
+    <div class="nav-foot">
+      <span id="nav-warn" class="nav-warn"></span>
+      <button id="nav-reroute" class="btn small secondary hidden">Reroute</button>
+      <button id="nav-stop" class="btn small danger-solid">Stop</button>
+    </div>
+  </div>
+
+  <aside id="panel" class="panel">
+    <div class="panel-sticky">
+    <button id="panel-handle" class="panel-handle" aria-label="Expand or collapse panel"></button>
+    <header class="panel-head">
+      <h1>Cycle Routes</h1>
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="ab" role="tab">A → B</button>
+        <button class="tab" data-tab="loop" role="tab">Loop</button>
+        <button class="tab" data-tab="suggested" role="tab">Suggested</button>
+        <button class="tab" data-tab="rides" role="tab">My rides</button>
+      </nav>
+    </header>
+    </div>
+
+    <section class="tab-body" data-body="ab">
+      <div class="field">
+        <label for="start-input">From</label>
+        <div class="search"><input id="start-input" placeholder="Search, or tap the map">
+          <button class="icon-btn" data-locate="start" title="Use my location">◎</button></div>
+      </div>
+      <div class="field">
+        <label for="end-input">To</label>
+        <div class="search"><input id="end-input" placeholder="Search, or tap the map"></div>
+      </div>
+      <details class="custom">
+        <summary>Custom mix</summary>
+        <div class="sliders" id="ab-sliders"></div>
+        <button id="custom-go" class="btn secondary">Route with my mix</button>
+      </details>
+      <button id="ab-go" class="btn primary">Find routes</button>
+    </section>
+
+    <section class="tab-body hidden" data-body="loop">
+      <div class="field">
+        <label for="loop-input">Start</label>
+        <div class="search"><input id="loop-input" placeholder="Search, or tap the map">
+          <button class="icon-btn" data-locate="loop" title="Use my location">◎</button></div>
+      </div>
+      <div class="field">
+        <label for="loop-km">Distance: <b id="loop-km-val">15</b> km</label>
+        <input id="loop-km" type="range" min="3" max="60" step="1" value="15">
+      </div>
+      <div class="field">
+        <label for="loop-profile">Style</label>
+        <select id="loop-profile"></select>
+      </div>
+      <button id="loop-go" class="btn primary">Generate loops</button>
+    </section>
+
+    <section class="tab-body hidden" data-body="suggested">
+      <p class="muted">Rides generated automatically from parks and the city centre, rated on every factor.</p>
+    </section>
+
+    <section class="tab-body hidden" data-body="rides">
+      <button id="record-go" class="btn primary">● Record a ride</button>
+      <p class="muted">Records your GPS track, then rates the streets you actually rode.</p>
+    </section>
+
+    <div id="status" class="status" role="status"></div>
+    <div id="results" class="results"></div>
+
+    <footer class="panel-foot">
+      <label class="toggle"><input type="checkbox" id="stress-toggle"> Show traffic-stress map</label>
+      <label class="toggle"><input type="checkbox" id="amenity-toggle"> Show bike shops, water, toilets, parking</label>
+      <label class="toggle gps-row">GPS: <select id="gps-source"><option value="device">This device</option></select></label>
+      <div id="legend" class="legend"></div>
+    </footer>
+  </aside>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>

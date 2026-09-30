@@ -1,0 +1,12 @@
+.venv/
+data_cache/
+__pycache__/
+*.egg-info/
+*.pdf
+*.gpx
+screenshots/
+test-rides.sqlite
+.DS_Store
+.pytest_cache/
+*.sqlite
+*.pem
