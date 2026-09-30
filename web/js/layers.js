@@ -9,6 +9,7 @@ const STOP_EMOJI = { cafe: "☕", treat: "🍦", food: "🌮", shop: "🛒", bik
 
 const LAYERS = {
   stress: { label: "Traffic stress on every street" },
+  trails: { label: "Cycle trails (green paved, brown unpaved, red = MTB grade 2+)" },
   amenities: { label: "Water, toilets, bike shops, parking" },
   stops: { label: "Cafés, food, sights (Overture)", minZoom: 15 },
   bikeshare: { label: "Bike share - live availability" },
@@ -68,7 +69,10 @@ export class Layers {
     const geo = this.data[name];
     const layer = L.geoJSON(z >= minZoom ? geo : { type: "FeatureCollection", features: [] }, {
       pointToLayer: (f, ll) => this.point(name, f.properties, ll),
-      style: (f) => name === "workzones"
+      style: (f) => name === "trails"
+        ? { color: f.properties.mtb >= 2 ? "#c0392b" : f.properties.paved ? "#1a7f37" : "#8b5a2b",
+            weight: 4, opacity: 0.9, dashArray: f.properties.paved ? null : "6 4" }
+        : name === "workzones"
         ? { color: f.properties.closed ? "#7a1fa2" : "#f0a202", weight: f.properties.closed ? 5 : 3,
             dashArray: f.properties.closed ? "10 6" : "4 5", opacity: 0.9 } : {},
       onEachFeature: (f, lyr) => lyr.bindPopup(() => this.popup(name, f.properties)),
@@ -90,6 +94,7 @@ export class Layers {
   popup(name, p) {
     if (name === "crashes") return `<b>Bike crash ${esc(p.date)}</b><br>${p.fatal ? "Fatal" : p.severe ? "Serious injury" : "Crash"}<br>${esc(p.where)}`;
     if (name === "counters") return `<b>${esc(p.name)}</b><br>≈${p.bikes_per_day} bikes/day (last 60 days)`;
+    if (name === "trails") return `<b>${esc(p.name || "Trail")}</b><br>${p.paved ? "Paved" : "Unpaved"}${p.mtb != null ? ` · MTB grade ${p.mtb}` : ""} · ${p.km} km segment`;
     if (name === "workzones") return `<b>${p.closed ? "Road closed" : "Lanes restricted"}</b><br>${esc(p.road)}<br>until ${esc(p.until)}`;
     if (name === "bikeshare") return `<b>${esc(p.name)}</b><br>${p.bikes} bikes (${p.ebikes} e-bikes) · ${p.docks} docks`;
     if (name === "hazards") {

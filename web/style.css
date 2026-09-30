@@ -194,3 +194,6 @@ details.custom summary { cursor: pointer; color: var(--muted); font-size: 14px; 
 .settings-grid > * { min-width: 0; }
 .settings .search input { min-width: 0; }
 .settings summary { padding-left: 0; }
+.avoid-list { display: grid; grid-template-columns: 1fr; gap: 2px; font-size: 12.5px; }
+.toggle.strong { font-weight: 600; font-size: 12.5px; }
+.settings-grid > span { align-self: start; padding-top: 3px; color: var(--muted); }

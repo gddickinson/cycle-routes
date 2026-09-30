@@ -82,3 +82,16 @@ conda env breaking rasterio.
 native background-GPS wrapper, bike+transit routing, BikeMaps (no Austin data), larger-area routing
 engine (GraphHopper). Docker image written but not built (daemon not running).
 **Tests:** 44 unit/API tests; screenshot suite 40 screenshots / 86 checks, all passing.
+
+## 2026-09-30 — Road-type exclusions, bike-lanes-only, cycle trails
+- Avoid options (major, secondary, busy by AADT, LTS 3-4, unpaved, steps, sidewalks, service,
+  trails) as a 40x soft penalty; "bike lanes, cycle paths & trails only" as a 5x penalty on
+  streets without bike space. Routes report any unavoidable avoided km.
+- Trails: osmnx bike filter + footways/paths/bridleways allowing bikes (not sidewalks) + any
+  mtb:scale way. Austin rebuild: +195 segments, 76 km of trails (29 km unpaved); Barton Creek
+  Greenbelt now reachable. New profiles Trails & greenways, Mountain-bike trails; trails layer.
+- Findings: OSM has almost no mtb:scale in central Austin (1 way, grade 0), so the MTB style uses
+  unpaved/rough trail surfaces. "Avoid major roads" originally cancelled bike-lanes-only (Austin's
+  protected lanes are on major roads) -> protected lanes exempted. Fixed a race where a slow
+  planning response drew routes after switching tab; SQLite reads now locked (intermittent 500).
+- Tests 53 passing; screenshot suite 45 screenshots / 93 checks passing.

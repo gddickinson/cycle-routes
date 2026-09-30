@@ -60,17 +60,21 @@ function select(id) {
   $("#panel").classList.remove("collapsed");
 }
 
+let requestSeq = 0;   // bumped by every new request and tab switch; stale responses are dropped
+
 async function run(label, fn, request = null) {
+  const seq = ++requestSeq;
   setStatus(label);
   $("#results").innerHTML = "";
   try {
     const routes = await fn();
+    if (seq !== requestSeq) return;   // superseded (user changed tab or asked for something else)
     routes.forEach((r) => { r.request = { ...(request || {}), profile: request?.profile || r.profile, bike: settings.bike }; });
     const notes = routes[0]?.conditions?.notes?.length ? ` · planned for ${routes[0].conditions.notes.join(", ")}` : "";
     setStatus(routes.length ? `${routes.length} option${routes.length > 1 ? "s" : ""} — tap one for details${notes}` : "Nothing found");
     showResults(routes);
   } catch (err) {
-    setStatus(err.message, true);
+    if (seq === requestSeq) setStatus(err.message, true);
   }
 }
 
@@ -216,6 +220,7 @@ async function showHeatmap() {
 // --- Tabs & controls ------------------------------------------------------------------------
 function switchTab(tab, load = true) {
   state.tab = tab;
+  requestSeq++;
   rmap.showTrack(null);
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
   document.querySelectorAll(".tab-body").forEach((b) => b.classList.toggle("hidden", b.dataset.body !== tab));

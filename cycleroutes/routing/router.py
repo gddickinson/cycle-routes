@@ -1,6 +1,7 @@
 """Point-to-point routing on the scored graph with preference-weighted costs."""
 
 import logging
+from dataclasses import replace
 
 import networkx as nx
 
@@ -33,6 +34,8 @@ def make_cost(profile: Profile, penalties: dict | None = None, graph: nx.MultiDi
     w = profile.weights()
     penalties = penalties or {}
     ctx = ctx or RouteContext()
+    if profile.prefer:     # the profile's preference travels with the context into edge_multiplier
+        ctx = replace(ctx, prefer=profile.prefer)
     nodes = graph.nodes if graph is not None else None
     hills_w = w["hills"] * (0.3 if ctx.bike == "ebike" else 1.0)
 

@@ -52,7 +52,9 @@ class CommunityStore:
             return self._db.execute(sql, args).lastrowid
 
     def _rows(self, sql: str, args=()) -> list[dict]:
-        return [dict(r) for r in self._db.execute(sql, args).fetchall()]
+        # one connection is shared by the API's worker threads: serialise reads too
+        with self._lock:
+            return [dict(r) for r in self._db.execute(sql, args).fetchall()]
 
     # --- hazards -----------------------------------------------------------------
     def report_hazard(self, kind: str, lat: float, lon: float, note: str = "") -> int:

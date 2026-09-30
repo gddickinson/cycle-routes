@@ -26,13 +26,19 @@ def _configure_osmnx() -> None:
         ox.settings.useful_tags_node = node_tags + ["highway"]
 
 
+def bike_filters() -> list[str]:
+    """osmnx's bike network plus trails (see config.TRAIL_FILTERS), as a union of queries."""
+    from osmnx._overpass import _get_network_filter
+    return [_get_network_filter("bike"), *config.TRAIL_FILTERS]
+
+
 def download_bike_network(lat: float, lon: float, radius_m: float) -> nx.MultiDiGraph:
-    """Bike-legal street network within radius_m of (lat, lon), simplified."""
+    """Bike-legal street network + cycle trails within radius_m of (lat, lon), simplified."""
     _configure_osmnx()
-    logger.info("Downloading OSM bike network (%.0f m around %.4f, %.4f)", radius_m, lat, lon)
+    logger.info("Downloading OSM bike network + trails (%.0f m around %.4f, %.4f)", radius_m, lat, lon)
     graph = overpass.with_fallback(lambda _url: ox.graph_from_point(
         (lat, lon), dist=radius_m, dist_type="bbox",
-        network_type="bike", simplify=True, retain_all=False))
+        custom_filter=bike_filters(), simplify=True, retain_all=False))
     logger.info("Network: %d nodes, %d edges", graph.number_of_nodes(), graph.number_of_edges())
     return graph
 

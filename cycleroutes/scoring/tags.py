@@ -81,3 +81,43 @@ def cycleway_kind(edge: dict) -> str:
 
 def is_yes(edge: dict, key: str) -> bool:
     return any(v not in ("no", "false", "0", "") for v in values(edge, key))
+
+
+TRAIL_WORDS = ("trail", "greenway", "greenbelt", "path", "hike and bike", "creek")
+CITY_INFRA = ("bike lane", "protected", "trail", "cycle track")
+
+
+def mtb_scale(edge: dict) -> int | None:
+    """OSM mtb:scale as an int (0 easy … 6 extreme), or None."""
+    for v in values(edge, "mtb:scale"):
+        digits = "".join(ch for ch in v if ch.isdigit())
+        if digits:
+            return int(digits[0])
+    return None
+
+
+def is_trail(edge: dict) -> bool:
+    """Off-road trail or greenway (not a sidewalk, not a lane beside a road)."""
+    hw = highway(edge)
+    if mtb_scale(edge) is not None:
+        return True
+    if hw in ("path", "track", "bridleway"):
+        return True
+    if hw == "footway":
+        return not any(v in ("sidewalk", "crossing") for v in values(edge, "footway"))
+    if hw == "cycleway":
+        name = " ".join(values(edge, "name"))
+        return any(w in name for w in TRAIL_WORDS)
+    return False
+
+
+def has_bike_infra(edge: dict) -> bool:
+    """Dedicated space for bikes: cycle path/trail, painted or protected lane, or a city-mapped facility."""
+    if highway(edge) == "cycleway" or cycleway_kind(edge) in ("lane", "track"):
+        return True
+    if is_trail(edge) and any(v in ("yes", "designated", "permissive") for v in values(edge, "bicycle")):
+        return True
+    if highway(edge) in ("path", "track") and not values(edge, "bicycle"):
+        return True     # unmarked paths are usually open to bikes
+    facility = str(edge.get("city_facility") or "").lower()
+    return any(w in facility for w in CITY_INFRA)

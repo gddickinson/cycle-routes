@@ -29,15 +29,16 @@ routing/ router (profiles, via, context, family cap) · loops · catalog · rati
 ### `cycleroutes/config.py`
 All defaults: paths, `DEFAULT_REGION`, data-source URLs (Overpass, Copernicus, 3DEP, Austin
 Socrata ids, TxDOT, canopy, noise, Overture, GBFS, Open-Meteo), LTS colours, GPS settings,
-`Profile` (+ shade, crossings weights) and `PROFILES` (fastest, safest, family, scenic,
-flattest, quiet, shady, balanced), `CROSSING_COST_M`, `FAMILY_MAX_DETOUR`, `HOT_APPARENT_C`.
+`Profile` (+ shade, crossings weights, `prefer`) and `PROFILES` (fastest, safest, family, scenic,
+flattest, quiet, trails, mtb, shady, balanced), `TRAIL_FILTERS` (extra OSM ways: bike-legal trails),
+`AVOID_PENALTY`, `INFRA_ONLY_PENALTY`, `PREFER_PENALTY`, `CROSSING_COST_M`, `FAMILY_MAX_DETOUR`, `HOT_APPARENT_C`.
 `cycleroutes/__init__.py` pins GDAL/PROJ data to rasterio's bundled copy.
 
 ### `cycleroutes/data/`
 | File | Contents |
 |---|---|
 | `overpass.py` | `with_fallback(download)` across Overpass mirrors; `post_query()` |
-| `osm_network.py` | `download_bike_network()`, `download_scenic_features()` |
+| `osm_network.py` | `bike_filters()` (osmnx bike + trails), `download_bike_network()`, `download_scenic_features()` |
 | `cycle_networks.py` | `fetch_cycle_route_ways()` (lcn/rcn/ncn/icn relations) |
 | `elevation.py` | `ElevationGrid`, `fetch_elevation_grid()` (Copernicus), `surface_to_terrain()`, `climb_along()` |
 | `amenities.py` | `fetch_amenities()` / `load_amenities()` (water, toilets, bike shops, parking, bike share) |
@@ -57,7 +58,7 @@ flattest, quiet, shady, balanced), `CROSSING_COST_M`, `FAMILY_MAX_DETOUR`, `HOT_
 | `apply.py` | `apply_all(region, refresh, only)` + per-source `apply_*`; `AADT_CAP_BY_CLASS` sanity caps |
 
 ### `cycleroutes/scoring/`
-- `tags.py` — tag normalisation helpers.
+- `tags.py` — tag helpers incl. `is_trail`, `mtb_scale`, `has_bike_infra`.
 - `lts.py` — `classify()` (OSM, mph-aware thresholds), `with_measured_traffic()`, `effective()` (+ city comfort).
 - `edge_scores.py` — `safety` (crashes), `quietness` (AADT, noise), `surface`, `fun` (shade), `speed_kmh`, `awkwardness`, `travel_time_s`.
 
@@ -66,10 +67,10 @@ flattest, quiet, shady, balanced), `CROSSING_COST_M`, `FAMILY_MAX_DETOUR`, `HOT_
 |---|---|
 | `geo.py` | haversine, bearing, destination, `NodeIndex` |
 | `route.py` | `Route` (edges, `ctx`, coords, profile, time), `edges_from_nodes`, `overlap` |
-| `context.py` | `RouteContext`, `BIKE_TYPES`, `edge_multiplier`, `travel_time_s` (bike + wind), `headwind_kmh` |
+| `context.py` | `RouteContext` (bike, dark, wind, heat, closures, reports, `avoid`, `infra_only`, `prefer`), `BIKE_TYPES`, `AVOID_TYPES` (protected lanes exempt), `edge_multiplier`, `travel_time_s`, `headwind_kmh` |
 | `router.py` | `make_cost(profile, penalties, graph, ctx)` (+ crossing penalty), `Router.route(via, ctx)`, `family_route`, `alternatives` |
 | `loops.py` | `generate_loops(..., ctx)` |
-| `rating.py` | `rate()` — ratings incl. shade; crashes, risky crossings, busiest AADT, noise, notice, context |
+| `rating.py` | `rate()` — ratings incl. shade; trail %, MTB grade, avoided km, crashes, crossings, busiest AADT, noise |
 | `directions.py` | `cue_sheet()` with service-road jog merging |
 | `catalog.py` | suggested rides from centre + reachable parks |
 | `stops.py` | `along(route, features)`, `longest_dry_stretch()` |
@@ -97,8 +98,8 @@ map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 |---|---|
 | `state.py` | `AppState` (region, router, routes, navigators, rides, community, live, gps) |
 | `live.py` | `LiveData`: work zones → closed/restricted edges, report multipliers, `context()` |
-| `app.py` | region, network, alternatives/route/loop (via, bike, depart, weather, closures, learned), suggested, amenities, geocode, exports (PDF layouts), `/sw.js` |
-| `planning_api.py` | conditions, weather/{rid}, stops/{rid}, stages/{rid}, layers/{name}, network/score, regions (list/build/job/activate) |
+| `app.py` | region, network, alternatives/route/loop (via, bike, depart, weather, closures, avoid, infra_only, learned), suggested, amenities, geocode, exports, `/sw.js` |
+| `planning_api.py` | conditions, weather/{rid}, stops/{rid}, stages/{rid}, layers/{name} (incl. trails), network/score, regions |
 | `community_api.py` | hazards, feedback, places, favourites, learned profile, ride share + `/share/{token}` page |
 | `tracking_api.py` | GPS sources/live, `/location` (iPhone tracker), rides (+ heatmap), navigate |
 | `serialize.py` | `route_payload()` |
@@ -124,7 +125,7 @@ map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 | `js/rides.js`, `js/search.js`, `js/more.js` | rides list, place search, More tab (score, sources, regions) |
 
 ## Tests (`tests/`, offline)
-`test_scoring`, `test_routing`, `test_api`, `test_tracking`, `test_sources`, `test_planning`
+`test_scoring`, `test_routing`, `test_api`, `test_tracking`, `test_sources`, `test_planning`, `test_road_options`
 (synthetic 6×6 grid in `conftest.py`; weather stubbed).
 
 ## Other

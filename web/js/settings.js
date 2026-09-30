@@ -11,6 +11,16 @@ export class Settings {
     this.depart = null;              // null = leave now
     this.weather = recall("weather", true);
     this.closures = recall("closures", true);
+    this.avoid = new Set(recall("avoid", []).filter((k) => k in (region.avoid_types || {})));
+    this.infraOnly = recall("infraOnly", false);
+    $("#avoid-list").innerHTML = Object.entries(region.avoid_types || {}).map(([k, label]) =>
+      `<label class="toggle"><input type="checkbox" data-avoid="${k}" ${this.avoid.has(k) ? "checked" : ""}> ${esc(label)}</label>`).join("");
+    document.querySelectorAll("[data-avoid]").forEach((cb) => cb.addEventListener("change", () => {
+      if (cb.checked) this.avoid.add(cb.dataset.avoid); else this.avoid.delete(cb.dataset.avoid);
+      this.update({});
+    }));
+    $("#infra-only").checked = this.infraOnly;
+    $("#infra-only").addEventListener("change", (e) => this.update({ infraOnly: e.target.checked }));
     this.info = null;
     const sel = $("#bike-type");
     sel.innerHTML = Object.entries(region.bike_types)
@@ -31,6 +41,8 @@ export class Settings {
     remember("bike", this.bike);
     remember("weather", this.weather);
     remember("closures", this.closures);
+    remember("avoid", [...this.avoid]);
+    remember("infraOnly", this.infraOnly);
     this.refreshConditions();
     this.onChange?.();
   }
@@ -38,6 +50,8 @@ export class Settings {
   query() {
     const q = new URLSearchParams({ bike: this.bike, weather: this.weather, closures: this.closures });
     if (this.depart) q.set("depart", this.depart);
+    if (this.avoid.size) q.set("avoid", [...this.avoid].join(","));
+    if (this.infraOnly) q.set("infra_only", "true");
     return q.toString();
   }
 
@@ -57,6 +71,8 @@ export class Settings {
     const bits = [this.region.bike_types[this.bike] || "Hybrid", when];
     if (w && this.weather) bits.push(`${Math.round(w.feels_c)}°C, wind ${w.wind_from} ${Math.round(w.wind_kmh)} km/h`);
     if (i?.dark) bits.push("🌙 dark");
+    if (this.infraOnly) bits.push("bike lanes only");
+    if (this.avoid.size) bits.push(`avoiding ${this.avoid.size}`);
     $("#settings-summary").textContent = bits.join(" · ");
     if (!i) { $("#conditions").textContent = "Conditions unavailable."; return; }
     const lines = [`Sunrise ${i.sunrise} · sunset ${i.sunset}${i.dark ? " · riding in the dark: lit streets preferred" : ""}`];

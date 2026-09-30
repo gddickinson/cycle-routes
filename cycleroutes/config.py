@@ -62,6 +62,15 @@ EXTRA_WAY_TAGS = [
     "cycleway", "cycleway:left", "cycleway:right", "cycleway:both",
     "bicycle", "surface", "smoothness", "lit", "segregated",
     "bridge", "tunnel", "oneway:bicycle", "sidewalk",
+    "mtb:scale", "footway", "foot", "trail_visibility",
+]
+
+# Extra ways added to the osmnx "bike" network: trails that allow bikes but are tagged
+# as footways (common for greenbelt trails), and anything with a mountain-bike grade.
+TRAIL_FILTERS = [
+    '["highway"~"footway|path|bridleway"]["bicycle"~"yes|designated|permissive"]'
+    '["footway"!~"sidewalk|crossing"]["access"!~"private|no"]',
+    '["highway"~"path|track|footway|bridleway"]["mtb:scale"]["bicycle"!~"no"]["access"!~"private|no"]',
 ]
 
 # Features that make a ride pleasant (buffer distance in metres from the road).
@@ -124,6 +133,7 @@ class Profile:
     surface: float = 0.0
     shade: float = 0.0
     crossings: float = 1.0          # penalty for unsignalised crossings of busy roads
+    prefer: str = ""                # "trails" or "mtb": strongly favour those ways
     time: bool = False              # base cost on travel time rather than distance
     lts_penalty: dict = field(default_factory=dict)  # {lts: multiplier}
 
@@ -142,6 +152,10 @@ PROFILES = {
                       fun=3, safety=1.5, traffic=1, shade=1, crossings=1.5, lts_penalty={4: 3.0}),
     "flattest": Profile("Flattest", "Avoid climbing", hills=4, safety=1),
     "quiet": Profile("Quietest", "Least motor traffic and noise", traffic=4, safety=1, crossings=2),
+    "trails": Profile("Trails & greenways", "Car-free trails and greenways wherever possible",
+                      fun=2, safety=1, crossings=2, prefer="trails", lts_penalty={3: 2.0, 4: 6.0}),
+    "mtb": Profile("Mountain-bike trails", "Unpaved and singletrack trails (loops)",
+                   fun=1, crossings=1, prefer="mtb", lts_penalty={3: 2.0, 4: 6.0}),
     "shady": Profile("Shadiest", "Most tree cover - for hot days", shade=4, safety=1.5, traffic=1,
                      lts_penalty={4: 3.0}),
     "balanced": Profile("Balanced", "A bit of everything",
@@ -149,6 +163,9 @@ PROFILES = {
                         crossings=1.5, lts_penalty={4: 2.0}),
 }
 DEFAULT_PROFILE = "balanced"
+AVOID_PENALTY = 40.0        # "avoid" road types: 40x cost - used only when nothing else connects
+INFRA_ONLY_PENALTY = 5.0    # "bike lanes & trails only": streets without bike space cost 5x
+PREFER_PENALTY = {"trails": 3.0, "mtb": 4.0}   # cost multiplier for ways that aren't what the profile seeks
 CROSSING_COST_M = 80.0      # an unsignalised crossing of a busy road ~ 80 m of extra riding
 FAMILY_MAX_DETOUR = 1.8     # family route longer than this x fastest -> relax and warn
 HOT_APPARENT_C = 30.0       # feels-like temperature above which shade is sought

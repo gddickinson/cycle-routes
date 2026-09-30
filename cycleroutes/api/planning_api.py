@@ -82,12 +82,36 @@ def layer(name: str):
         return bikeshare.stations() if austin.covers(*s.region.bbox) else EMPTY
     if name == "stops":
         return overture.load(region)
+    if name == "trails":
+        return _trails_geojson(s.region)
     if name == "hazards":
         return {"type": "FeatureCollection", "features": [
             {"type": "Feature", "geometry": {"type": "Point", "coordinates": [h["lon"], h["lat"]]},
              "properties": {k: h[k] for k in ("id", "kind", "label", "note", "created", "confirmations")}}
             for h in s.community.hazards()]}
     raise HTTPException(404, f"No layer '{name}'")
+
+
+_trail_cache: dict[str, dict] = {}
+
+
+def _trails_geojson(region) -> dict:
+    """Off-road trails in the network (one feature per segment), with name, surface and MTB grade."""
+    if region.name not in _trail_cache:
+        from cycleroutes.scoring import tags
+        seen, feats = set(), []
+        for u, v, d in region.graph.edges(data=True):
+            key = (min(u, v), max(u, v))
+            if not d.get("trail") or key in seen:
+                continue
+            seen.add(key)
+            feats.append({"type": "Feature", "geometry": {"type": "LineString",
+                          "coordinates": [[round(x, 5), round(y, 5)] for x, y in d["geometry"].coords]},
+                          "properties": {"name": (tags.first(d, "name") or "").title(),
+                                         "paved": d.get("surface_q", 1) >= 0.6,
+                                         "mtb": d.get("mtb_scale"), "km": round(d["length"] / 1000, 2)}})
+        _trail_cache[region.name] = {"type": "FeatureCollection", "features": feats}
+    return _trail_cache[region.name]
 
 
 @router.get("/api/network/score")

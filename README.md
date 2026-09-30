@@ -19,6 +19,13 @@ for **safety** (Level of Traffic Stress), **traffic**, **fun/scenery**, **hills*
 - **Your ride, your conditions**: bike type (road, gravel, MTB, e-bike, cargo, kids), departure
   time (after dark → lit streets), live wind and heat (Open-Meteo → headwind and shade weighting),
   current road-work closures (City of Austin WZDx feed) and rider hazard reports all change the route.
+- **Road choices**: avoid major, secondary or busy roads (measured traffic), stressful streets,
+  unpaved surfaces, steps, sidewalks, service roads/parking lots, or trails; and **bike lanes, cycle
+  paths & trails only (where possible)**. Protected lanes beside major roads are not "avoided";
+  anything unavoidable is reported on the route.
+- **Cycle trails**: greenbelt and mountain-bike trails that OSM tags as bike-legal footpaths are
+  included; *Trails & greenways* and *Mountain-bike trails* styles; a trails map layer
+  (paved / unpaved / MTB grade).
 - **Via points** (drag to reshape), **compare all options** side by side, **stops along the way**
   (water, toilets, bike shops, bike share with live bikes, cafés, sights, places to stay) and the
   longest stretch without water, **weather warnings**, **multi-day stages** for long rides.

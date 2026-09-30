@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 PROFILE_RATING_KEY = {
     "safest": "safety", "family": "safety", "scenic": "fun", "flattest": "hills",
-    "quiet": "traffic", "fastest": "speed", "shady": "shade",
+    "quiet": "traffic", "fastest": "speed", "shady": "shade", "trails": "fun", "mtb": "fun",
 }
 
 

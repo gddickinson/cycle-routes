@@ -64,18 +64,21 @@ class RideStore:
             return self._db.execute("DELETE FROM rides WHERE id = ?", (ride_id,)).rowcount > 0
 
     def ride(self, ride_id: int) -> dict | None:
-        row = self._db.execute("SELECT * FROM rides WHERE id = ?", (ride_id,)).fetchone()
+        with self._lock:
+            row = self._db.execute("SELECT * FROM rides WHERE id = ?", (ride_id,)).fetchone()
         return dict(row) if row else None
 
     def rides(self, limit: int = 100) -> list[dict]:
-        rows = self._db.execute(
-            "SELECT r.*, COUNT(p.t) AS n_points FROM rides r LEFT JOIN points p ON p.ride_id = r.id "
-            "GROUP BY r.id ORDER BY r.started DESC LIMIT ?", (limit,)).fetchall()
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT r.*, COUNT(p.t) AS n_points FROM rides r LEFT JOIN points p ON p.ride_id = r.id "
+                "GROUP BY r.id ORDER BY r.started DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
 
     def points(self, ride_id: int) -> list[dict]:
-        rows = self._db.execute("SELECT t, lat, lon, ele, speed_kmh, heading, accuracy_m FROM points "
-                                "WHERE ride_id = ? ORDER BY t", (ride_id,)).fetchall()
+        with self._lock:
+            rows = self._db.execute("SELECT t, lat, lon, ele, speed_kmh, heading, accuracy_m FROM points "
+                                    "WHERE ride_id = ? ORDER BY t", (ride_id,)).fetchall()
         return [dict(r) for r in rows]
 
 

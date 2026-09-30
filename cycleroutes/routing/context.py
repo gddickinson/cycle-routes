@@ -38,6 +38,39 @@ BIKE_TYPES = {
 }
 
 
+def _busy(e: dict) -> bool:
+    aadt = e.get("aadt")
+    if aadt:
+        return aadt > 10000
+    return tags.highway(e) in ("trunk", "primary") or (tags.highway(e) == "secondary" and tags.lanes(e) >= 4)
+
+
+def _protected(e: dict) -> bool:
+    """Physically separated from traffic: cycle track or protected lane."""
+    return (tags.cycleway_kind(e) == "track" or tags.highway(e) == "cycleway"
+            or "protected" in str(e.get("city_facility") or "").lower())
+
+
+def _in_traffic(pred):
+    """Road-type avoidance is about riding in that traffic: a protected track alongside is fine."""
+    return lambda e: pred(e) and not _protected(e)
+
+
+# key -> (label, predicate on an edge)
+AVOID_TYPES = {
+    "major": ("Major roads (primary / trunk)", _in_traffic(lambda e: tags.highway(e) in ("trunk", "primary"))),
+    "secondary": ("Secondary roads", _in_traffic(lambda e: tags.highway(e) == "secondary")),
+    "busy": ("Busy roads (> 10,000 vehicles/day)", _in_traffic(_busy)),
+    "stressful": ("Stressful streets (LTS 3–4)", lambda e: e.get("lts", 1) >= 3),
+    "unpaved": ("Unpaved surfaces", lambda e: e.get("surface_q", 1.0) < 0.6),
+    "steps": ("Steps", lambda e: tags.highway(e) == "steps"),
+    "sidewalks": ("Sidewalks & footpaths", lambda e: tags.highway(e) in ("footway", "pedestrian")
+                  and not e.get("trail", False)),
+    "service": ("Service roads & parking lots", lambda e: tags.highway(e) == "service"),
+    "trails": ("Off-road trails", lambda e: e.get("trail", False)),
+}
+
+
 @dataclass
 class RouteContext:
     bike: str = "hybrid"
@@ -48,6 +81,9 @@ class RouteContext:
     closed: set = field(default_factory=set)      # undirected edge keys fully closed
     restricted: set = field(default_factory=set)  # partially closed (lanes)
     edge_multipliers: dict = field(default_factory=dict)  # community reports & feedback
+    avoid: frozenset = frozenset()        # keys of AVOID_TYPES
+    infra_only: bool = False              # bike lanes, cycle paths & trails only (where possible)
+    prefer: str = ""                      # set from the profile: "trails" / "mtb"
 
     @property
     def bike_type(self) -> BikeType:
@@ -65,7 +101,15 @@ class RouteContext:
             notes.append("hot: shade preferred")
         if self.closed or self.restricted:
             notes.append(f"{len(self.closed)} closures avoided")
+        if self.avoid:
+            notes.append("avoiding " + ", ".join(AVOID_TYPES[k][0].split(" (")[0].lower()
+                                                 for k in sorted(self.avoid) if k in AVOID_TYPES))
+        if self.infra_only:
+            notes.append("bike lanes & trails only where possible")
         return notes
+
+    def avoided(self, edge: dict) -> bool:
+        return any(AVOID_TYPES[k][1](edge) for k in self.avoid if k in AVOID_TYPES)
 
 
 def compass(deg: float) -> str:
@@ -119,6 +163,15 @@ def edge_multiplier(edge: dict, key: tuple, ctx: RouteContext, safety_weight: fl
     hw_kmh = headwind_kmh(edge, ctx)
     if hw_kmh > 0:
         m *= 1 + 0.015 * hw_kmh
+    if ctx.avoid and ctx.avoided(edge):
+        m *= config.AVOID_PENALTY
+    if ctx.infra_only and not edge.get("bike_infra", False):
+        m *= config.INFRA_ONLY_PENALTY
+    if ctx.prefer == "trails" and not edge.get("trail", False):
+        m *= config.PREFER_PENALTY["trails"]
+    elif ctx.prefer == "mtb":
+        rough_trail = edge.get("trail", False) and (edge.get("mtb_scale") is not None or surf < 0.6)
+        m *= 0.8 if rough_trail else (1.0 if edge.get("trail", False) else config.PREFER_PENALTY["mtb"])
     if key in ctx.closed:
         m *= 25.0
     elif key in ctx.restricted:

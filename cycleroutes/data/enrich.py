@@ -77,6 +77,9 @@ def add_scores(graph: nx.MultiDiGraph) -> None:
     for _, v, data in graph.edges(data=True):
         (x0, y0), (x1, y1) = data["geometry"].coords[0], data["geometry"].coords[-1]
         data["bearing"] = round(bearing_deg(y0, x0, y1, x1), 1)
+        data["trail"] = tags.is_trail(data)
+        data["mtb_scale"] = tags.mtb_scale(data)
+        data["bike_infra"] = tags.has_bike_infra(data)
         data["lts_osm"] = lts.classify(data)
         data["lts"] = lts.effective(data)
         data["safety"] = edge_scores.safety(data)

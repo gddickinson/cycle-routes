@@ -91,3 +91,16 @@ def test_ride_recording_navigation_and_iphone_ingest(client, region):
     assert again["ride_id"] == res["ride_id"]              # appended to the same open ride
     assert client.post("/location", json={"locations": []}).status_code == 400
     assert client.delete(f"/api/rides/{res['ride_id']}").json()["deleted"] == res["ride_id"]
+
+
+def test_avoid_and_infra_params(client, region):
+    a, b = _ll(node_latlon(region, 2, 0)), _ll(node_latlon(region, 2, 5))
+    res = client.get(f"/api/route?start={a}&end={b}&profile=fastest&avoid=major,unpaved&infra_only=true")
+    assert res.status_code == 200
+    body = res.json()
+    assert any("avoiding" in n for n in body["conditions"]["notes"])
+    assert body["stats"]["avoided_km"] is not None
+    assert client.get(f"/api/route?start={a}&end={b}&avoid=motorways").status_code == 400
+    assert "avoid_types" in client.get("/api/region").json()
+    trails = client.get("/api/layers/trails").json()
+    assert trails["features"] and "paved" in trails["features"][0]["properties"]

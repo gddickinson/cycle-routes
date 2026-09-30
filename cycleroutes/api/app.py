@@ -18,7 +18,7 @@ from cycleroutes.export.formats import to_gpx
 from cycleroutes.export.print_map import route_pdf
 from cycleroutes.routing.loops import generate_loops
 from cycleroutes.routing.rating import rate
-from cycleroutes.routing.context import BIKE_TYPES
+from cycleroutes.routing.context import AVOID_TYPES, BIKE_TYPES
 from cycleroutes.routing.router import RoutingError, custom_profile
 
 app = FastAPI(title="Cycle Routes prototype")
@@ -55,6 +55,7 @@ def region_info():
                      for k, p in config.PROFILES.items()},
         "lts_colors": config.LTS_COLORS, "lts_labels": config.LTS_LABELS,
         "bike_types": {k: b.label for k, b in BIKE_TYPES.items()},
+        "avoid_types": {k: label for k, (label, _) in AVOID_TYPES.items()},
         "sources": getattr(s.region, "sources", {}),
     }
 
@@ -68,11 +69,19 @@ def _via(via: str | None) -> list[tuple[float, float]]:
     return [_latlon(p) for p in via.split(";") if p.strip()] if via else []
 
 
-def _conditions(bike: str, depart: str | None, weather: bool, closures: bool):
+def _conditions(bike: str, depart: str | None, weather: bool, closures: bool,
+                avoid: str | None = None, infra_only: bool = False):
     try:
-        return state().live.context(bike, depart, weather, closures)
+        ctx, info = state().live.context(bike, depart, weather, closures)
     except ValueError as exc:
         raise HTTPException(400, f"Bad departure time: {exc}") from exc
+    keys = {k for k in (avoid or "").split(",") if k}
+    unknown = keys - set(AVOID_TYPES)
+    if unknown:
+        raise HTTPException(400, f"Unknown avoid option(s): {', '.join(sorted(unknown))}")
+    ctx.avoid, ctx.infra_only = frozenset(keys), infra_only
+    info["notes"] = ctx.describe()
+    return ctx, info
 
 
 def _store(r, stats, info, title=None) -> dict:
@@ -81,10 +90,11 @@ def _store(r, stats, info, title=None) -> dict:
 
 @app.get("/api/alternatives")
 def alternatives(start: str, end: str, via: str | None = None, bike: str = "hybrid",
-                 depart: str | None = None, weather: bool = True, closures: bool = True):
+                 depart: str | None = None, weather: bool = True, closures: bool = True,
+                 avoid: str | None = None, infra_only: bool = False):
     """Auto-generated options between two points (one per profile), each rated."""
     s = state()
-    ctx, info = _conditions(bike, depart, weather, closures)
+    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only)
     routes = s.router.alternatives(_latlon(start), _latlon(end), via=_via(via), ctx=ctx)
     fastest = min(r.time_s for r in routes)
     return [_store(r, rate(r, fastest_time_s=fastest), info) for r in routes]
@@ -93,10 +103,10 @@ def alternatives(start: str, end: str, via: str | None = None, bike: str = "hybr
 @app.get("/api/route")
 def route(start: str, end: str, profile: str = config.DEFAULT_PROFILE, via: str | None = None,
           bike: str = "hybrid", depart: str | None = None, weather: bool = True, closures: bool = True,
-          safety: float = 0, fun: float = 0, traffic: float = 0, hills: float = 0,
+          avoid: str | None = None, infra_only: bool = False, safety: float = 0, fun: float = 0, traffic: float = 0, hills: float = 0,
           surface: float = 0, shade: float = 0):
     s = state()
-    ctx, info = _conditions(bike, depart, weather, closures)
+    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only)
     a, b, v = _latlon(start), _latlon(end), _via(via)
     if profile == "family":
         r = s.router.family_route(a, b, v, ctx)
@@ -109,10 +119,11 @@ def route(start: str, end: str, profile: str = config.DEFAULT_PROFILE, via: str 
 @app.get("/api/loop")
 def loop(start: str, km: float = Query(15, ge=2, le=100), profile: str = "scenic",
          count: int = Query(3, ge=1, le=5), bike: str = "hybrid", depart: str | None = None,
-         weather: bool = True, closures: bool = True, safety: float = 0, fun: float = 0,
+         weather: bool = True, closures: bool = True, avoid: str | None = None, infra_only: bool = False,
+         safety: float = 0, fun: float = 0,
          traffic: float = 0, hills: float = 0, surface: float = 0, shade: float = 0):
     s = state()
-    ctx, info = _conditions(bike, depart, weather, closures)
+    ctx, info = _conditions(bike, depart, weather, closures, avoid, infra_only)
     loops = generate_loops(s.router, _latlon(start), km,
                            _profile(profile, safety, fun, traffic, hills, surface, shade), count, ctx)
     return [_store(r, stats, info, f"{r.length_m / 1000:.1f} km loop") for r, stats in loops]

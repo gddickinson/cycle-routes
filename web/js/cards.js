@@ -44,6 +44,8 @@ export function elevationSvg(points) {
 
 function dataFacts(s) {
   const f = [];
+  if (s.avoided_km) f.push(`⚠ ${s.avoided_km} km on road types you chose to avoid (no alternative)`);
+  if (s.trail_pct) f.push(`${s.trail_pct}% on trails${s.max_mtb_scale != null ? ` (MTB grade up to ${s.max_mtb_scale})` : ""}`);
   if (s.crashes != null) f.push(`${s.crashes} recorded bike crash${s.crashes === 1 ? "" : "es"} on these streets${s.crashes_severe ? ` (${s.crashes_severe} serious)` : ""}`);
   if (s.risky_crossings) f.push(`${s.risky_crossings} unsignalised crossing${s.risky_crossings > 1 ? "s" : ""} of busy roads`);
   if (s.busiest_aadt) f.push(`busiest road ≈${s.busiest_aadt.toLocaleString()} vehicles/day`);

@@ -58,6 +58,9 @@ def quietness(edge: dict) -> float:
 
 def surface(edge: dict) -> float:
     known = [SURFACE_QUALITY[s] for s in tags.values(edge, "surface") if s in SURFACE_QUALITY]
+    scale = tags.mtb_scale(edge)
+    if scale is not None and scale >= 2:
+        known.append(0.3)
     if known:
         return min(known)
     hw = tags.highway(edge)
@@ -70,7 +73,7 @@ def surface(edge: dict) -> float:
 
 def fun(edge: dict) -> float:
     """Pleasantness: scenery, calm, being on a greenway/signed route, smoothness."""
-    greenway = 1.0 if tags.highway(edge) in lts_mod.OFF_ROAD else 0.0
+    greenway = 1.0 if tags.highway(edge) in lts_mod.OFF_ROAD or tags.is_trail(edge) else 0.0
     route = min(edge.get("route_rank", 0), 2) / 2
     shade = edge.get("shade", 0.3)
     return (0.38 * edge.get("scenic", 0.0) + 0.22 * quietness(edge)
@@ -86,6 +89,9 @@ def speed_kmh(edge: dict) -> float:
         return 3.0
     if tags.highway(edge) in ("footway", "pedestrian"):
         base = min(base, 12.0)  # shared with pedestrians
+    scale = tags.mtb_scale(edge)
+    if scale is not None and scale >= 1:   # technical singletrack: slower the harder it is
+        base = min(base, max(16.0 - 3.0 * scale, 6.0))
     for service in tags.values(edge, "service"):
         if service in config.AWKWARD_SERVICE:
             base = min(base, config.AWKWARD_SERVICE[service][0])

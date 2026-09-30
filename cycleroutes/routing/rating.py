@@ -63,11 +63,17 @@ def rate(route: Route, fastest_time_s: float | None = None) -> dict:
     ascent = sum(d.get("ascent", 0.0) for d in route.edge_data())
     descent = sum(d.get("descent", 0.0) for d in route.edge_data())
     lts_share = {lvl: 0.0 for lvl in (1, 2, 3, 4)}
-    infra = signed = 0.0
+    infra = signed = trail = avoided = 0.0
+    ctx = route.ctx
+    ctx_avoid = ctx.avoided if ctx is not None and getattr(ctx, "avoid", None) else None
     for d in route.edge_data():
         lts_share[d["lts"]] += d["length"]
-        if tags.highway(d) == "cycleway" or tags.cycleway_kind(d) in ("lane", "track"):
+        if d.get("bike_infra", tags.has_bike_infra(d)):
             infra += d["length"]
+        if d.get("trail"):
+            trail += d["length"]
+        if ctx_avoid is not None and ctx_avoid(d):
+            avoided += d["length"]
         if d.get("route_rank", 0) > 0:
             signed += d["length"]
     lts_pct = {k: round(100 * v / max(length, 1), 1) for k, v in lts_share.items()}
@@ -122,6 +128,10 @@ def rate(route: Route, fastest_time_s: float | None = None) -> dict:
         "signed_routes": route_names[:6],
         "scenic_pct": round(100 * _weighted(route, "scenic"), 1),
         "ratings": ratings,
+        "trail_pct": round(100 * trail / max(length, 1), 1),
+        "max_mtb_scale": max((d["mtb_scale"] for d in route.edge_data() if d.get("mtb_scale") is not None),
+                             default=None),
+        "avoided_km": round(avoided / 1000, 2) if ctx_avoid else None,
         "crashes": crashes, "crashes_severe": severe, "risky_crossings": crossings,
         "measured_traffic_pct": round(100 * measured / max(length, 1), 1),
         "busiest_aadt": int(busiest) or None,

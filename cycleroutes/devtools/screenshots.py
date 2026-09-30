@@ -106,7 +106,9 @@ def run(out_dir: Path, url: str | None = None, region: str = config.DEFAULT_REGI
                 scenarios.desktop_loops_and_suggested(s, pts), scenarios.exports(s, base),
                 scenarios_ride.amenities(s, pts)))
             for name, fn in (("settings", scenarios_plan.settings_and_via), ("layers", scenarios_plan.layers_and_menu),
-                             ("saving", scenarios_plan.favourites_and_links), ("print", scenarios_plan.print_layouts)):
+                             ("saving", scenarios_plan.favourites_and_links), ("print", scenarios_plan.print_layouts),
+                             ("roads", scenarios_plan.road_options_and_trails),
+                             ("race", scenarios_plan.stale_results_are_dropped)):
                 _run_group(browser, name, DESKTOP, out_dir, shots, lambda s, fn=fn: fn(s, base, pts))
             _run_group(browser, "phone", PHONE, out_dir, shots,
                        lambda s: scenarios.phone(s, base, pts))

@@ -12,6 +12,7 @@ const COMPARE_ROWS = [
   ["Crashes on route", (s) => s.crashes ?? "–"], ["Busy crossings", (s) => s.risky_crossings ?? "–"],
   ["Busiest road (veh/day)", (s) => s.busiest_aadt ? s.busiest_aadt.toLocaleString() : "–"],
   ["Noise", (s) => s.avg_noise_db ? `${s.avg_noise_db} dB` : "–"], ["Bike infrastructure", (s) => `${s.bike_infra_pct}%`],
+  ["On trails", (s) => `${s.trail_pct ?? 0}%`], ["Avoided road types", (s) => s.avoided_km != null ? `${s.avoided_km} km` : "–"],
 ];
 
 export class Plan {

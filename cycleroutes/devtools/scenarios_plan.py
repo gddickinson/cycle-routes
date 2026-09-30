@@ -2,6 +2,7 @@
 comparison, data layers, press-and-hold menu (hazards, feedback, places), favourites,
 share links, the More tab and the extra print layouts."""
 
+import re
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -147,3 +148,61 @@ def print_layouts(sess: ShotSession, url: str, pts: Points) -> None:
             tmp = Path(tempfile.mkstemp(suffix=".png")[1])
             doc[page].get_pixmap(dpi=70).save(tmp)
             sess.attach_image(f"print_{layout.split('&')[0]}{'_scale' if 'scale' in layout else ''}", label, tmp)
+
+
+def road_options_and_trails(sess: ShotSession, url: str, pts: Points) -> None:
+    _open(sess, url)
+    sess.page.click("#settings summary")
+    sess.page.check("[data-avoid=major]")
+    sess.page.check("[data-avoid=busy]")
+    sess.page.check("#infra-only")
+    sess.page.wait_for_timeout(600)
+    summary = sess.page.inner_text("#settings-summary")
+    sess.check("Summary shows road options", "bike lanes only" in summary and "avoiding 2" in summary, summary)
+    sess.shot("road_options", "Ride settings: avoid major and busy roads; bike lanes, cycle paths & trails only.",
+              element="#panel")
+    _route(sess, pts)
+    status = sess.page.inner_text("#status")
+    sess.check("Routes planned with the road options", "avoiding" in status and "bike lanes" in status, status)
+    infra = [float(m.group(1)) for t in sess.page.locator(".card.selected .facts").all_inner_texts()
+             for m in [re.search(r"([\d.]+)% bike infrastructure", t)] if m]
+    sess.check("Selected route mostly on bike infrastructure", bool(infra) and infra[0] >= 50, str(infra))
+    sess.shot("bike_lanes_only", "Bike lanes & trails only: routes stick to dedicated bike space where they can.")
+    for k in ("major", "busy"):
+        sess.page.uncheck(f"[data-avoid={k}]")
+    sess.page.uncheck("#infra-only")
+
+    sess.page.click("[data-tab=more]")
+    sess.page.check("[data-layer=trails]")
+    sess.page.wait_for_timeout(2500)
+    frame(sess, [pts.loop, pts.b])
+    n = sess.page.evaluate("document.querySelectorAll('.leaflet-overlay-pane path').length")
+    sess.check("Trail lines drawn", n > 50, f"{n} paths")
+    sess.shot("trails_layer", "Cycle trails layer: paved greenways (green), unpaved (brown dashes), MTB grade 2+ (red).")
+    sess.page.uncheck("[data-layer=trails]")
+
+    sess.page.click("[data-tab=loop]")
+    frame(sess, [pts.loop])
+    sess.click_map(*pts.loop)
+    sess.page.select_option("#loop-profile", "trails")
+    sess.page.fill("#loop-km", "15")
+    sess.page.dispatch_event("#loop-km", "input")
+    sess.page.click("#loop-go")
+    sess.wait_for_results()
+    facts = " ".join(sess.page.locator(".card.selected .facts").all_inner_texts())
+    sess.check("Trail loop reports its share of trails", "% on trails" in facts, facts[:160])
+    sess.shot("trail_loop", "15 km 'Trails & greenways' loop, maximising car-free trails.")
+
+
+def stale_results_are_dropped(sess: ShotSession, url: str, pts: Points) -> None:
+    """Regression: a slow planning response must not draw routes after a tab switch."""
+    _open(sess, url)
+    frame(sess, [pts.a, pts.b])
+    sess.click_map(*pts.a)
+    sess.click_map(*pts.b)          # starts planning...
+    sess.page.click("[data-tab=more]")   # ...then leave before it returns
+    sess.page.wait_for_timeout(6000)
+    drawn = sess.page.evaluate("document.querySelectorAll('.leaflet-overlay-pane path.leaflet-interactive').length")
+    sess.check("No routes drawn after leaving the tab", drawn == 0, f"{drawn} route paths")
+    sess.check("No route cards on the More tab", sess.page.locator(".card").count() == 0)
+    sess.shot("stale_results", "Switching tab while routes are being planned: the late answer is ignored.")
