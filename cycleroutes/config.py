@@ -11,7 +11,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data_cache"
 WEB_DIR = PROJECT_ROOT / "web"
 
+# Sent to every public server (Overpass, Nominatim, tiles...). Their usage policies ask for a
+# contact: if you run your own copy or fork, put your own project URL or email here.
 USER_AGENT = "CycleRoutes-prototype/0.1 (+https://github.com/gddickinson/cycle-routes)"
+
+# Safety notice printed on every PDF page and in exported GPX files (the web app shows a
+# fuller version on first launch: web/js/notice.js).
+SAFETY_NOTICE = ("Automatically generated route, not checked by a person; the data may be wrong or out of "
+                 "date. Watch the road, obey signs and traffic laws, and use your own judgement.")
+SAFETY_NOTICE_SHORT = "Auto-generated, unchecked route: watch the road and use your own judgement."
 
 # Default demo region: central Austin, TX (the pyNav default map centre).
 DEFAULT_REGION = {"name": "austin", "lat": 30.2800, "lon": -97.7400, "radius_m": 10000}

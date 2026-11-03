@@ -182,6 +182,9 @@ def cmd_serve(args) -> None:
         cert, key = _self_signed_cert()
         ssl = {"ssl_certfile": cert, "ssl_keyfile": key}
         print("HTTPS with a self-signed certificate: your phone will warn once - accept it to continue.")
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        print("Warning: the app has no login. Anyone on this network can open it and see your rides, "
+              "saved places and live position. Only use --host on a network you trust.")
     uvicorn.run("cycleroutes.api.app:app", host=args.host, port=args.port, **ssl)
 
 

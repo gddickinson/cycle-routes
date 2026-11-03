@@ -74,5 +74,6 @@ def test_cues_and_exports(region, router):
     assert any("Turn" in c.instruction for c in cues)
     gpx = to_gpx(r, "Test & route")
     assert "<trkpt" in gpx and "&amp;" in gpx and "<ele>" in gpx
+    assert "not checked by a person" in gpx          # safety notice travels with the file
     assert len(route_segments_geojson(r)["features"]) == len(r.edges)
     assert network_geojson(region.graph)["features"]

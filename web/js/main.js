@@ -8,6 +8,7 @@ import { Plan } from "./plan.js";
 import { RideController } from "./ride.js";
 import { renderRides, summaryHtml } from "./rides.js";
 import { attachSearch } from "./search.js";
+import { initSafetyNotice } from "./notice.js";
 import { TripBuilder } from "./trip.js";
 import { Voice } from "./voice.js";
 import { Settings, planLink, readLink } from "./settings.js";
@@ -366,6 +367,7 @@ function buildControls() {
 }
 
 async function init() {
+  initSafetyNotice();
   try {
     region = await api("/api/region");
   } catch (err) {

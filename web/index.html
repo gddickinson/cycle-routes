@@ -80,13 +80,13 @@
       <div id="place-chips" class="chips"></div>
       <div class="field">
         <label for="start-input">From</label>
-        <div class="search"><input id="start-input" placeholder="Search, or tap the map">
+        <div class="search"><input id="start-input" placeholder="Search (press Enter), or tap the map" enterkeyhint="search">
           <button class="icon-btn" data-locate="start" title="Use my location">◎</button></div>
       </div>
       <div id="via-list" class="via-list"></div>
       <div class="field">
         <label for="end-input">To</label>
-        <div class="search"><input id="end-input" placeholder="Search, or tap the map">
+        <div class="search"><input id="end-input" placeholder="Search (press Enter), or tap the map" enterkeyhint="search">
           <button id="via-add" class="icon-btn" title="Add a stop on the way">+</button></div>
       </div>
       <details class="custom" id="ab-trip">
@@ -109,7 +109,7 @@
     <section class="tab-body hidden" data-body="loop">
       <div class="field">
         <label for="loop-input">Start</label>
-        <div class="search"><input id="loop-input" placeholder="Search, or tap the map">
+        <div class="search"><input id="loop-input" placeholder="Search (press Enter), or tap the map" enterkeyhint="search">
           <button class="icon-btn" data-locate="loop" title="Use my location">◎</button></div>
       </div>
       <div class="field">
@@ -175,16 +175,45 @@
       </div>
       <h3>Data sources</h3>
       <div id="sources" class="sources"></div>
+      <h3>Safety</h3>
+      <p class="muted">Routes are generated automatically and never checked by a person.
+        <a href="#" data-safety>Read the safety notice</a></p>
       <p class="muted">Tip: press and hold (right-click) on the map to report a hazard, rate a street or save a place.</p>
     </section>
 
     <div id="status" class="status" role="status"></div>
+    <p class="safety-note">⚠️ Routes are generated automatically and not checked by a person.
+      Check them before you go, watch the road and use your own judgement.
+      <a href="#" data-safety>Safety notice</a></p>
     <div id="results" class="results"></div>
 
     <footer class="panel-foot">
       <div id="legend" class="legend"></div>
     </footer>
   </aside>
+
+  <div id="safety" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="safety-title">
+    <div class="modal-box">
+      <h2 id="safety-title">⚠️ Before you ride or walk</h2>
+      <p><strong>Every route in this app is generated automatically by a computer from open map
+        data. No person has ridden, walked or checked it.</strong></p>
+      <ul>
+        <li>Map data can be wrong or out of date. A route may use a road that is busy, fast,
+          closed, under construction, private, unlit or unsuitable for you or your bike, or a
+          path that no longer exists.</li>
+        <li>Safety, traffic and other ratings are estimates from incomplete data, not
+          guarantees. A "low stress" or "safe" rating does not mean a route is safe.</li>
+        <li>Weather, road works and hazard reports may be missing, late or wrong.</li>
+        <li>Always watch the road, obey signs and traffic laws, and use your own judgement.
+          If a route looks unsafe, don't take it.</li>
+        <li>Don't look at or handle your phone while moving: stop somewhere safe first. Use
+          lights after dark and suitable safety gear, and carry what you need.</li>
+      </ul>
+      <p>Use the routes, directions and voice guidance at your own risk. Do not rely on this
+        app for safe navigation.</p>
+      <button id="safety-ok" class="btn">I understand</button>
+    </div>
+  </div>
 
   <script src="/static/vendor/leaflet/leaflet.js"></script>
   <script src="/static/vendor/protomaps-leaflet.js"></script>

@@ -50,7 +50,10 @@ export class RideController {
     this.showBanner();
     this.spoken = new Set();
     this.renderIdle(route ? "Waiting for GPS…" : "Recording — waiting for GPS…");
-    if (route) this.say(`Starting ${route.title}. ${route.cues?.[0]?.instruction || ""}`, "start");
+    if (route) {
+      $("#nav-warn").textContent = "Unchecked route: watch the road";   // cleared by the first GPS update
+      this.say(`Starting ${route.title}. This route is automatic and unchecked: watch the road and follow traffic signs. ${route.cues?.[0]?.instruction || ""}`, "start");
+    }
     this.flushTimer = setInterval(() => this.flush(), FLUSH_MS);
     this.startFeed();
     this.keepAwake();

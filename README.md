@@ -1,6 +1,6 @@
 # 🚲 Cycle Routes
 
-**Safe, fun bike rides and walks, generated automatically from open data, rated on
+**Low-stress, fun bike rides and walks, generated automatically from open data, rated on
 everything that matters, and ready for your computer, your phone or paper.**
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
@@ -8,7 +8,8 @@ everything that matters, and ready for your computer, your phone or paper.**
 ![Leaflet](https://img.shields.io/badge/map-Leaflet-199900?logo=leaflet&logoColor=white)
 ![Data](https://img.shields.io/badge/data-OpenStreetMap%20%2B%20open%20data-7EBC6F?logo=openstreetmap&logoColor=white)
 ![Status](https://img.shields.io/badge/status-prototype-orange)
-![Tests](https://img.shields.io/badge/tests-79%20unit%20%2B%20121%20UI%20checks-brightgreen)
+![Licence](https://img.shields.io/badge/licence-MIT-blue)
+![Tests](https://img.shields.io/badge/tests-79%20unit%20%2B%20124%20UI%20checks-brightgreen)
 
 Most route planners find you the *shortest* way. Cycle Routes looks for the way you'd
 actually *want* to ride. It downloads street data and a dozen other open datasets for an
@@ -34,9 +35,14 @@ works in any city covered by OpenStreetMap.
   dark green for paths and calm streets, red for busy, fast roads.</em>
 </p>
 
+> [!WARNING]
+> **Routes are generated automatically and have not been checked by anyone. Do not rely on
+> this app for safe navigation.** See [Safety](#safety) before you ride or walk a route.
+
 ---
 
 ## Contents
+- [Safety](#safety)
 - [Highlights](#highlights)
 - [Feature tour](#feature-tour)
 - [How it works](#how-it-works)
@@ -50,10 +56,41 @@ works in any city covered by OpenStreetMap.
 - [Contributing](#contributing)
 - [Credits & licences](#credits--licences)
 
+## Safety
+Cycle Routes is an experimental prototype. Every route, rating, direction and voice prompt
+comes from a computer combining open data. **No person has ridden, walked or checked any of
+them.** That matters for your safety:
+
+- **The data can be wrong or out of date.** OpenStreetMap and the other datasets have
+  gaps and errors. A route may send you along a busy or fast road, through a closed or
+  private section, across a dangerous junction, down an unlit or unpaved path, or onto a
+  path that no longer exists.
+- **Ratings are estimates, not guarantees.** "Low stress", "safe" and "family" mean the
+  route scored well on the available data, not that it is safe for you, your bike, your
+  children or today's conditions. Crash records and traffic counts are incomplete and
+  only exist for some areas.
+- **Live information can be missing or late.** Weather, road works, closures and hazard
+  reports may not be up to date.
+- **Directions can be wrong.** GPS can drift, and turn instructions and rerouting can be
+  late or misleading.
+
+When you use it:
+- Check a route on the map before you set off, and don't take any part that looks unsafe.
+- Watch the road, obey traffic signs, signals and laws, and use your own judgement. These
+  always take priority over the app.
+- Don't look at or handle your phone while moving. Stop somewhere safe first, or use voice
+  guidance and a mount.
+- Use lights after dark, wear suitable safety gear, and carry water, a phone and what you
+  need for repairs. Walkers on hikes should tell someone their plan.
+
+The app shows this notice on first launch, keeps a reminder under every list of routes,
+and prints a short version on every PDF and GPX file. The software comes with no warranty,
+and you use the routes at your own risk.
+
 ## Highlights
 | | |
 |---|---|
-| 🛡️ **Safety first** | Level of Traffic Stress for every street, adjusted with measured traffic, city comfort ratings, crash history and risky crossings |
+| 🛡️ **Safety-aware scoring** | Level of Traffic Stress for every street, adjusted with measured traffic, city comfort ratings, crash history and risky crossings |
 | 🎯 **Many riding styles** | Fastest, safest, family, scenic, trails, mountain-bike, flattest, quiet, shady, balanced, or your own custom mix |
 | ☕ **Length & stops** | "About 30 km with a café and two water stops." Real places are spread evenly along the route |
 | 🚶 **Walking too** | Commutes, urban adventures, sightseeing tours, hikes, green & quiet, shady, step-free |
@@ -239,6 +276,12 @@ Browsers only allow GPS over HTTPS, so start the server with
 (accept the certificate warning once). Add it to your home screen to install it as an
 app. *More › Save map & data on this device* makes it work without signal.
 
+> [!CAUTION]
+> The server has **no login**. With `--host 0.0.0.0`, anyone on the same network can open
+> the app and see your rides, saved places and live position. Only do this on a network
+> you trust (your home Wi-Fi), never on public Wi-Fi, and don't expose the port to the
+> internet.
+
 ## Command line
 ```bash
 cycleroutes route --from 30.2672,-97.7431 --to 30.2489,-97.7700 --pdf route.pdf --gpx route.gpx
@@ -271,6 +314,15 @@ Downloads are cached in `data_cache/` and reused wherever they cover the area. A
 inside an existing one is simply cut from it. Per route, you can score with **all
 available data** or **OpenStreetMap only**.
 
+**Usage policies.** Each copy of the app sends its requests from the machine it runs on,
+so please keep within each provider's terms. The code already identifies itself, waits
+between requests, caches downloads, and searches only when you press Enter (Nominatim
+doesn't allow search-as-you-type). If you run a fork, set your own contact in
+`USER_AGENT` in `cycleroutes/config.py`. Open-Meteo's free API and ip-api.com (used for
+the optional rough IP location) are **for non-commercial use only**. The public tile,
+Overpass and Nominatim servers are run by volunteers for light use, so a public website
+or any heavy use needs self-hosted servers or a commercial provider.
+
 Not used, because they need sign-up or aren't open: Strava, Mapillary, OpenRouteService,
 TxDOT DriveTexas, and Garmin/Wahoo developer APIs.
 
@@ -298,8 +350,8 @@ hardware/      Arduino NMEA GPS sketch
 .venv/bin/cycleroutes screenshots --out screenshots   # UI test run
 ```
 The screenshot run drives the app in headless Chrome at desktop and phone sizes and in
-dark mode. It covers planning, walking, trips with stops, get-there/extend, offline mode
-and a simulated GPS ride. It saves 56 numbered screenshots and PDF renders, runs 121
+dark mode. It covers the first-launch safety notice, planning, walking, trips with stops, get-there/extend, offline mode
+and a simulated GPS ride. It saves 58 numbered screenshots and PDF renders, runs 124
 checks, and writes `screenshots/report.html`. It exits with code 1 if any check fails.
 Speech is muted during test runs.
 
@@ -313,8 +365,10 @@ Speech is muted during test runs.
   sightseeing tours double back.
 - **UI:** the legend uses cycling wording in walk mode, and share links can't yet carry
   combined (get-there/extend) routes.
-- **Public servers:** public tile, Overpass and Nominatim servers have usage policies.
-  They're fine for a prototype, but self-host before going public.
+- **Public servers:** the free tile, Overpass, Nominatim and Open-Meteo servers are fine
+  for personal use. Running the app as a public website would need self-hosted servers or
+  a commercial provider (see [usage policies](#open-data-sources)).
+- **Not field-tested:** routes are generated, not surveyed. See [Safety](#safety).
 
 Ideas that would be good next steps: more cities with open crash and traffic data, native
 app packaging, GraphHopper export, and community-shared routes.
@@ -338,5 +392,5 @@ Issues and pull requests are welcome. Before opening a PR:
 - Bundled libraries: [Leaflet](https://leafletjs.com/) and
   [protomaps-leaflet](https://github.com/protomaps/protomaps-leaflet) (BSD licences in `web/vendor/`).
 
-**Licence:** no licence has been chosen for this code yet, so all rights are reserved by
-the author until a `LICENSE` file is added.
+**Licence:** [MIT](LICENSE) for the code in this repository. The software comes with no
+warranty (see [Safety](#safety)). Map and open data keep their own licences, listed above.

@@ -107,16 +107,34 @@ def desktop_core(sess: ShotSession, url: str, pts: Points) -> None:
     sess.shot("custom_mix", "Custom mix sliders (safety 5, avoid hills 4) produce a single tailored route.")
 
 
+def safety_notice(sess: ShotSession, url: str) -> None:
+    """First launch shows the safety notice; once acknowledged it stays away."""
+    sess.page.goto(url)
+    sess.page.wait_for_selector("#safety:not(.hidden)", timeout=15000)
+    sess.expect_visible_in_viewport("#safety-ok", "Safety notice button reachable")
+    sess.shot("notice", "First launch: routes are automatic and unchecked; don't rely on them for safety.")
+    sess.page.click("#safety-ok")
+    sess.check("Notice closes on 'I understand'", sess.page.locator("#safety.hidden").count() == 1)
+    sess.page.reload()
+    sess.page.wait_for_selector("#map .leaflet-pane", state="attached")
+    sess.page.wait_for_timeout(1000)
+    sess.check("Notice not shown again after acknowledging", sess.page.locator("#safety.hidden").count() == 1)
+
+
 def desktop_search(sess: ShotSession) -> None:
     sess.page.fill("#start-input", "")
     sess.page.type("#start-input", "park", delay=40)
+    sess.page.wait_for_timeout(800)
+    sess.check("No search while typing (Nominatim policy)",
+               sess.page.locator(".suggestions:not(.hidden)").count() == 0)
+    sess.page.press("#start-input", "Enter")
     try:
         sess.page.wait_for_selector(".suggestions:not(.hidden)", timeout=12000)
         items = sess.page.locator(".suggestions:not(.hidden) div").count()
         sess.check("Search shows suggestions", items >= 1, f"{items} rows")
     except Exception:  # Nominatim is an external service; record rather than crash
         sess.check("Search shows suggestions", False, "no dropdown within 12 s (Nominatim unreachable?)")
-    sess.shot("search", "Typing a place name searches Nominatim, limited to the mapped area.", element="#panel")
+    sess.shot("search", "Pressing Enter searches Nominatim, limited to the mapped area.", element="#panel")
     sess.page.keyboard.press("Escape")
     sess.page.click("#status")  # blur to close the dropdown
 

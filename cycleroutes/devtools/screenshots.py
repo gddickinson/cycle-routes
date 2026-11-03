@@ -77,8 +77,11 @@ def _launch(p):
         return p.chromium.launch(headless=True)
 
 
-def _run_group(browser, name: str, context_opts: dict, out_dir: Path, shots: list[Shot], fn) -> None:
+def _run_group(browser, name: str, context_opts: dict, out_dir: Path, shots: list[Shot], fn,
+               safety_seen: bool = True) -> None:
     ctx = browser.new_context(**context_opts)
+    if safety_seen:  # the first-launch safety notice has its own scenario; skip it elsewhere
+        ctx.add_init_script("localStorage.setItem('cr.safetyAck', '999');")
     # Automated runs must be silent: headless Chrome still speaks through the OS voice.
     ctx.add_init_script("""(() => { if (window.speechSynthesis) {
         window.speechSynthesis.speak = (u) => { window.__spoken = (window.__spoken || []).concat(u.text); };
@@ -106,6 +109,10 @@ def run(out_dir: Path, url: str | None = None, region: str = config.DEFAULT_REGI
         pts = scenarios.Points(info["bbox"])
         with sync_playwright() as p:
             browser = _launch(p)
+            _run_group(browser, "safety", DESKTOP, out_dir, shots,
+                       lambda s: scenarios.safety_notice(s, base), safety_seen=False)
+            _run_group(browser, "safety-phone", PHONE, out_dir, shots,
+                       lambda s: scenarios.safety_notice(s, base), safety_seen=False)
             _run_group(browser, "desktop", DESKTOP, out_dir, shots, lambda s: (
                 scenarios.desktop_core(s, base, pts), scenarios.desktop_search(s),
                 scenarios.desktop_loops_and_suggested(s, pts), scenarios.exports(s, base),

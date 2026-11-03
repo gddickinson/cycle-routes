@@ -229,6 +229,21 @@ def _cue_table(fig, cues, top: float) -> None:
         fig.text(0.19, y + 0.005, textwrap.shorten(cue.instruction, 90), fontsize=8.5)
 
 
+class _NoticePages:
+    """PdfPages wrapper that prints the safety notice along the bottom of every page."""
+
+    def __init__(self, pdf: PdfPages):
+        self.pdf = pdf
+
+    def savefig(self, fig) -> None:
+        small = fig.get_figwidth() < A4[0] * 0.75          # A6 cue cards
+        text = config.SAFETY_NOTICE_SHORT if small else config.SAFETY_NOTICE
+        fig.text(0.5, 0.004, textwrap.fill(text, 90 if small else 175), ha="center", va="bottom",
+                 fontsize=5 if small else 6.5, linespacing=1.1,
+                 color="#8a1c1c", style="italic")
+        self.pdf.savefig(fig)
+
+
 def route_pdf(route: Route, stats: dict, title: str = "Cycle route", basemap: str = "CyclOSM",
               layout: str = "standard", scale: float | None = None, qr_url: str | None = None,
               extra_facts: list[str] | None = None) -> bytes:
@@ -242,7 +257,8 @@ def route_pdf(route: Route, stats: dict, title: str = "Cycle route", basemap: st
     tiles = TileManager(basemap)
     cues = cue_sheet(route)
     buf = io.BytesIO()
-    with PdfPages(buf) as pdf:
+    with PdfPages(buf) as raw:
+        pdf = _NoticePages(raw)
         if layout == "card":
             print_layouts.cue_card_pages(pdf, route, stats, cues, title, qr_url)
         else:

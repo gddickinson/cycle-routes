@@ -2,6 +2,7 @@
 
 from xml.sax.saxutils import escape
 
+from cycleroutes import config
 from cycleroutes.routing.directions import cue_sheet
 from cycleroutes.routing.route import Route
 
@@ -26,7 +27,7 @@ def to_gpx(route: Route, name: str = "Cycle route") -> str:
     """GPX 1.1 with the track plus turn cues as waypoints (Garmin/Wahoo friendly)."""
     lines = ['<?xml version="1.0" encoding="UTF-8"?>',
              '<gpx version="1.1" creator="CycleRoutes" xmlns="http://www.topografix.com/GPX/1/1">',
-             f"  <metadata><name>{escape(name)}</name></metadata>"]
+             f"  <metadata><name>{escape(name)}</name><desc>{escape(config.SAFETY_NOTICE)}</desc></metadata>"]
     for cue in cue_sheet(route):
         lines.append(f'  <wpt lat="{cue.lat:.6f}" lon="{cue.lon:.6f}"><name>{escape(cue.instruction)}'
                      f"</name><desc>{cue.at_km:.2f} km</desc></wpt>")

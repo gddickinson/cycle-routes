@@ -136,3 +136,18 @@ engine (GraphHopper). Docker image written but not built (daemon not running).
   (via points on an ellipse), loops of any length, 11 stop types with counts, spread evenly along
   the route; missing stop types reported.
 - Tests 79; screenshot suite 56 screenshots / 121 checks, all passing.
+
+## 2026-11-03 — Preparing the repo to go public
+- Audit before making the repo public: no secrets, credentials, ride data or personal locations in the
+  files or git history; images carry no GPS metadata; vendored licences present.
+- Public-server policies: place search now runs only on Enter (Nominatim forbids search-as-you-type);
+  `USER_AGENT` comment asks forks to set their own contact; README "Usage policies" paragraph
+  (Open-Meteo and ip-api.com are non-commercial only; volunteer servers are for light use).
+- Safety warnings: README "Safety" section + warning banner; first-launch safety notice in the app
+  (`web/js/notice.js`, re-shown when its version changes), a reminder under every results list, a
+  link in More; voice and nav banner remind at the start of navigation; every PDF page and GPX file
+  carries `config.SAFETY_NOTICE`. "Safe" wording softened in the tagline and highlights.
+- `serve --host` (non-local) prints a warning that the app has no login; README caution likewise.
+- Fixed `pyproject.toml`: `osmium` was imported but not declared, so a fresh install failed.
+- Screenshot run gains a `safety` / `safety-phone` group; other groups pre-acknowledge the notice.
+- Added the MIT `LICENSE`; README licence section and badge updated.

@@ -143,7 +143,10 @@ export function renderCards(container, routes, selectedId, colors, h) {
   });
   const selEl = container.querySelector(".card.selected");
   if (selEl) {
-    scrollIntoScroller(selEl);
+    // For the first card, keep the safety reminder above the results in view too.
+    const note = container.previousElementSibling;
+    const first = selEl === container.querySelector(".card");
+    scrollIntoScroller(first && note?.classList.contains("safety-note") ? note : selEl);
     h.onDetails?.(routes.find((x) => x.id === selectedId));
   }
 }

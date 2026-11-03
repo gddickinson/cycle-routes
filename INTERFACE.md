@@ -31,7 +31,8 @@ All defaults: paths, `DEFAULT_REGION`, data-source URLs (Overpass, Copernicus, 3
 Socrata ids, TxDOT, canopy, noise, Overture, GBFS, Open-Meteo), LTS colours, GPS settings,
 `Profile` (+ shade, crossings weights, `prefer`) and `PROFILES` (fastest, safest, family, scenic,
 flattest, quiet, trails, mtb, shady, balanced), `TRAIL_FILTERS` (extra OSM ways: bike-legal trails),
-`AVOID_PENALTY`, `INFRA_ONLY_PENALTY`, `PREFER_PENALTY`, `CROSSING_COST_M`, `FAMILY_MAX_DETOUR`, `HOT_APPARENT_C`.
+`AVOID_PENALTY`, `INFRA_ONLY_PENALTY`, `PREFER_PENALTY`, `CROSSING_COST_M`, `FAMILY_MAX_DETOUR`, `HOT_APPARENT_C`,
+`USER_AGENT` (forks set their own contact), `SAFETY_NOTICE` / `SAFETY_NOTICE_SHORT` (printed on PDFs and GPX).
 `cycleroutes/__init__.py` pins GDAL/PROJ data to rasterio's bundled copy.
 
 ### `cycleroutes/data/`
@@ -111,8 +112,8 @@ favourites, learned weights (`record_choice`, `learned_weights`), live-share tok
 (`sun_times`, `daylight_left`), `bikeshare.py` (GBFS `stations()`).
 
 ### `cycleroutes/export/`
-`formats.py` (GPX/GeoJSON), `tiles.py` (TileManager), `print_map.py` (`route_pdf(layout, scale, qr_url)`,
-map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
+`formats.py` (GPX/GeoJSON; GPX metadata carries the safety notice), `tiles.py` (TileManager), `print_map.py` (`route_pdf(layout, scale, qr_url)`,
+map/details pages, QR; `_NoticePages` stamps the safety notice on every page), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 
 ### `cycleroutes/api/`
 | File | Contents |
@@ -128,7 +129,7 @@ map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 | `serialize.py` | `route_payload()` |
 
 ### `cycleroutes/devtools/` — `cycleroutes screenshots`
-`session.py` (ShotSession), `scenarios.py`, `scenarios_plan.py`, `scenarios_ride.py`, `scenarios_walk.py`, `scenarios_extend.py`, `scenarios_trip.py`, `scenarios_offline.py`, `report.py`, `screenshots.py`.
+`session.py` (ShotSession), `scenarios.py` (incl. `safety_notice`), `scenarios_plan.py`, `scenarios_ride.py`, `scenarios_walk.py`, `scenarios_extend.py`, `scenarios_trip.py`, `scenarios_offline.py`, `report.py`, `screenshots.py`.
 
 ### `cycleroutes/cli.py`
 `build | walk | sources | offline | catalog | amenities | route | loop | gps | screenshots | serve [--https --serial-gps --ip-location]`.
@@ -148,7 +149,8 @@ map/details pages, QR), `print_layouts.py` (`strip_pages`, `cue_card_pages`).
 | `js/plan.js` | `Plan`: via points, places, favourites, stops/weather details, stages, compare |
 | `js/cards.js` | `renderCards` (ratings, open-data facts, print menu, save/link) |
 | `js/ride.js` | `RideController`: GPS feed, navigation banner, voice, reroute, live share |
-| `js/rides.js`, `js/search.js`, `js/more.js`, `js/sources.js` | rides list, place search, More tab (score, regions, offline), data-sources panel |
+| `js/rides.js`, `js/search.js`, `js/more.js`, `js/sources.js` | rides list, place search (on Enter only: Nominatim policy), More tab (score, regions, offline), data-sources panel |
+| `js/notice.js` | `initSafetyNotice` / `showSafetyNotice`: first-launch safety notice (version stored in `cr.safetyAck`), `[data-safety]` links reopen it |
 
 ## Tests (`tests/`, offline)
 `test_scoring`, `test_routing`, `test_api`, `test_tracking`, `test_sources`, `test_planning`, `test_road_options`, `test_offline`, `test_data_sources`, `test_walking`, `test_combine`, `test_planner`
