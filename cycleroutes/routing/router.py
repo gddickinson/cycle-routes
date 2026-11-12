@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 TIME_TO_METRES = config.BASE_CYCLING_SPEED_KMH / 3.6  # compare time and distance costs
 CLIMB_COST_M = 8.0      # 1 m of climbing ~ 8 m of flat riding, per unit hills weight
 MAX_SNAP_M = 500.0
+# used by Router.family_route when the fully low-stress family route is an absurd detour
+RELAXED_FAMILY = Profile("Family (relaxed)", "Short busier sections allowed", safety=5, traffic=2,
+                         hills=1, crossings=4, lts_penalty={3: 2.0, 4: 8.0})
 
 
 class RoutingError(ValueError):
@@ -129,9 +132,7 @@ class Router:
         fastest_m = fastest_m or self.route(start, end, "fastest", via, ctx).length_m
         if route.length_m > config.FAMILY_MAX_DETOUR * fastest_m:
             detoured = route.length_m
-            relaxed = Profile("Family (relaxed)", "Short busier sections allowed", safety=5, traffic=2,
-                              hills=1, crossings=4, lts_penalty={3: 2.0, 4: 8.0})
-            cost = make_cost(relaxed, None, self.graph, ctx)
+            cost = make_cost(RELAXED_FAMILY, None, self.graph, ctx)
             stops = [self.snap(*p) for p in [start, *(via or []), end]]
             edges = []
             for a, b in zip(stops[:-1], stops[1:]):
