@@ -151,3 +151,22 @@ engine (GraphHopper). Docker image written but not built (daemon not running).
 - Fixed `pyproject.toml`: `osmium` was imported but not declared, so a fresh install failed.
 - Screenshot run gains a `safety` / `safety-phone` group; other groups pre-acknowledge the notice.
 - Added the MIT `LICENSE`; README licence section and badge updated.
+
+## 2026-11-12 — Web demo & static GitHub Pages site (port 8184)
+- New `cycleroutes/web/` (FastAPI + plain ES modules, house web kit): Home, Plan a ride (A→B per style + loops,
+  bike type, dark, wind, avoid, bike-lanes-only), Example routes (Python-computed), Street scores (OSM tags → LTS and
+  scores; profile weights), Your area (built areas + how to build/serve), About. `run_web.py`, `requirements-web.txt`,
+  `scripts/build_static.py`, `scripts/screenshots.py`, `.github/workflows/pages.yml`.
+- Demo area: Prospect Park, Brooklyn (40.6602, -73.9690, r = 1.6 km), built with `cycleroutes build` over Overpass
+  (overpass-api.de was at capacity and private.coffee timed out twice; the third mirror, maps.mail.ru,
+  answered after ~35 min) + Copernicus DEM, other
+  layers off. 1,118 nodes / 2,497 edges / 146.5 km. `scripts/make_demo_area.py` stores raw tags + enrichment as
+  `cycleroutes/web/demo/prospect_park.json` (0.47 MB, ODbL) and checks the rebuilt graph scores like the region.
+- JS port of tags/LTS/edge scores/add_scores/add_crossings, context, router (networkx's bidirectional Dijkstra with
+  its tie-breaking), loops, rating, cue sheet. Exact parity needed Python's `round()` (ties to even), numpy's pairwise
+  sum and Python 3.12's compensated `sum()` (a descent of 3.4999… vs 3.5 changed `round()`); all three are ported.
+  `engine.test.mjs` vs `tests/fixtures/engine_parity.json`: 104 routes, 11 loops, 646 edges, all identical.
+- Refactors (no behaviour change): `add_scores`/`add_crossings` moved to GIS-free `scoring/edge_attrs.py` (re-exported
+  by `data/enrich.py`); `router.RELAXED_FAMILY`; test fixtures moved to `tests/full_fixtures.py`, loaded by
+  `conftest.py` only when geopandas/osmnx are installed, so `pytest tests/test_web.py` runs with requirements-web.txt.
+- Tests: 94 passed, 1 skipped (full suite incl. 16 web tests); node engine test passes; screenshots static + local ok.

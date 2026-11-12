@@ -10,3 +10,4 @@ test-rides.sqlite
 .pytest_cache/
 *.sqlite
 *.pem
+site/

@@ -76,6 +76,8 @@ flattest, quiet, trails, mtb, shady, balanced), `TRAIL_FILTERS` (extra OSM ways:
 - `lts.py` — `classify()` (OSM, mph-aware thresholds), `with_measured_traffic()`, `effective()` (+ city comfort).
 - enrich also stores OpenStreetMap-only variants (`lts_osm`, `safety_osm`, `quiet_osm`, `fun_osm`) for `data=osm` routing.
 - `edge_scores.py` — `safety` (crashes), `quietness` (AADT, noise), `surface`, `fun` (shade), `speed_kmh`, `awkwardness`, `travel_time_s`.
+- `edge_attrs.py` — `add_scores(graph)` (bearing, LTS, all scores, OSM-only variants, signal delays) and
+  `add_crossings(graph)`; GIS-free so the web demo can use it. `data/enrich.py` re-exports both.
 
 ### `cycleroutes/routing/`
 | File | Contents |
@@ -83,7 +85,7 @@ flattest, quiet, trails, mtb, shady, balanced), `TRAIL_FILTERS` (extra OSM ways:
 | `geo.py` | haversine, bearing, destination, `NodeIndex` |
 | `route.py` | `Route` (edges, `ctx`, coords, profile, time), `edges_from_nodes`, `overlap` |
 | `context.py` | `RouteContext` (bike, dark, wind, heat, closures, reports, `avoid`, `infra_only`, `prefer`), `BIKE_TYPES`, `AVOID_TYPES` (protected lanes exempt), `edge_multiplier`, `travel_time_s`, `headwind_kmh` |
-| `router.py` | `make_cost(profile, penalties, graph, ctx)` (+ crossing penalty), `Router.route(via, ctx)`, `family_route`, `alternatives` |
+| `router.py` | `make_cost(profile, penalties, graph, ctx)` (+ crossing penalty), `Router.route(via, ctx)`, `family_route` (`RELAXED_FAMILY`), `alternatives` |
 | `loops.py` | `generate_loops(..., ctx)` |
 | `rating.py` | `rate()` — ratings incl. shade; trail %, MTB grade, avoided km, crashes, crossings, busiest AADT, noise |
 | `directions.py` | `cue_sheet()` with service-road jog merging |
@@ -152,9 +154,26 @@ map/details pages, QR; `_NoticePages` stamps the safety notice on every page), `
 | `js/rides.js`, `js/search.js`, `js/more.js`, `js/sources.js` | rides list, place search (on Enter only: Nominatim policy), More tab (score, regions, offline), data-sources panel |
 | `js/notice.js` | `initSafetyNotice` / `showSafetyNotice`: first-launch safety notice (version stored in `cr.safetyAck`), `[data-safety]` links reopen it |
 
+## Showcase web app & static site (`cycleroutes/web/`, `python run_web.py` → port 8184)
+Runs on a committed demo area (Prospect Park, Brooklyn; OpenStreetMap data, ODbL) with no downloads and no GIS stack;
+published to GitHub Pages by `.github/workflows/pages.yml`. (The full planner for a built area stays `cycleroutes serve`.)
+| File | Contents |
+|---|---|
+| `app.py` | FastAPI: `/api/info`, `/api/model`, `/api/demo`, `/api/examples` (exported as JSON, `STATIC_ENDPOINTS`); local only: `POST /api/route`, `/api/loop`, `/api/score` (Python check of the browser results), `GET /api/areas` |
+| `model.py` | `model()`: every table/weight the JS engine uses, from `config` and the scoring/routing modules |
+| `demo_area.py` | `load_demo`, `graph_from_demo` (raw tags + enrichment → nx graph scored by `edge_attrs.add_scores`), `load_graph`, `summary`, `EDGE_COLUMNS` |
+| `examples.py` | `examples()` (A→B alternatives between hubs + loops from the centre), `alternatives_json`, `loops_json`, `route_json` |
+| `demo/prospect_park.json` | compact demo graph (tag sets, nodes, edge rows, geometries, elevation profiles) |
+| `static/` | ES modules, no build step: `core.js` (kit router), `main.js`, `static_api.js`, pages `home/explore/examples/scoring/area/about.js`, `map_view.js` (canvas map, no tiles), `route_cards.js`, `compare.js`, `engine.js` |
+| `static/` engine | JS port: `osm_tags.js` (tags.py), `scoring_engine.js` (lts.py, edge_scores.py, edge_attrs.py), `context.js`, `router_engine.js` (router.py, route.py; networkx bidirectional Dijkstra), `loops.js`, `rating.js`, `directions.js`, `geo.js` (+ Python `round`/`sum` and numpy sum), `demo_graph.js`; tested by `engine.test.mjs` |
+
+Scripts: `scripts/make_demo_area.py` (built region → demo JSON, full install, local only), `scripts/make_engine_fixtures.py`
+(→ `tests/fixtures/engine_parity.json`), `scripts/build_static.py` (→ `site/`), `scripts/screenshots.py` (smoke test + `docs/img/`).
+
 ## Tests (`tests/`, offline)
 `test_scoring`, `test_routing`, `test_api`, `test_tracking`, `test_sources`, `test_planning`, `test_road_options`, `test_offline`, `test_data_sources`, `test_walking`, `test_combine`, `test_planner`
-(synthetic 6×6 grid in `conftest.py`; weather stubbed).
+(synthetic 6×6 grid in `full_fixtures.py`, loaded by `conftest.py` when the full install is present; weather stubbed);
+`test_web` (web app, static build, fixture currency, node engine test; needs only `requirements-web.txt`).
 
 ## Other
-`hardware/gps_i2c_serial/` Arduino NMEA sketch · `Dockerfile` · `scripts/build_demo.py`.
+`hardware/gps_i2c_serial/` Arduino NMEA sketch · `Dockerfile` · `scripts/build_demo.py` · `run_web.py` · `requirements-web.txt`.

@@ -1,0 +1,67 @@
+/* Cycle Routes accents (park green / route pink / sky cyan) and page styles; the shared theme is style.css. */
+:root { --accent:#7cff6b; --accent2:#ff6fd8; --accent3:#4fd2ff; --glow:rgba(124,255,107,.13); }
+button, .btn { color:#071a03; } .seg button.on { color:#071a03; }
+.mark { background:radial-gradient(circle at 50% 50%, #1a7f37 0 40%, transparent 42%); }
+
+/* home */
+.hero.split { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:28px; align-items:center; }
+.hero-map { margin:0; } .hero-map figcaption { margin-top:6px; }
+.flow { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; counter-reset:f; }
+.flow div { border:1px solid var(--line); border-radius:6px; padding:12px 14px; background:rgba(12,16,32,.8); font-size:14px; }
+.flow div::before { counter-increment:f; content:counter(f); font:600 12px var(--mono); color:var(--bg); background:var(--accent);
+  border-radius:50%; width:20px; height:20px; display:inline-grid; place-items:center; margin-right:8px; }
+
+/* map */
+.mapwrap { position:relative; }
+.mapwrap canvas { display:block; width:100%; touch-action:none; cursor:crosshair; }
+.mapwrap canvas:focus-visible { outline:2px solid var(--accent3); outline-offset:-2px; }
+.mapwrap canvas:focus-visible ~ .cross { display:block; }
+.cross { display:none; position:absolute; left:50%; top:50%; width:18px; height:18px; margin:-9px; pointer-events:none;
+  border:2px solid var(--accent3); border-radius:50%; }
+.mapbtns { position:absolute; right:8px; top:8px; display:flex; flex-direction:column; gap:4px; }
+.mapbtns button { margin:0; width:34px; height:34px; padding:0; font-size:18px; background:rgba(5,7,13,.85); }
+.attrib { position:absolute; right:0; bottom:0; font-size:11px; padding:2px 6px; background:rgba(5,7,13,.8); color:var(--mute); }
+.legend { display:flex; flex-wrap:wrap; gap:4px 14px; margin:6px 0; color:var(--mute); }
+.legend i { display:inline-block; width:18px; height:4px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+
+/* planner */
+.plan { display:grid; grid-template-columns:300px minmax(0,1fr); gap:18px; align-items:start; }
+.plan .controls { margin:0; }
+label.chk { display:flex; gap:8px; align-items:flex-start; margin-top:8px; color:var(--ink); }
+label.chk input { margin-top:4px; }
+details { margin-top:10px; } details summary { cursor:pointer; color:var(--accent3); font-size:14px; }
+.pa { color:#7cff6b; } .pb { color:#ff6fd8; }
+.sets { margin:8px 0 12px; } .sets button { white-space:normal; text-align:left; }
+
+/* route cards */
+.rcard { border-left:4px solid var(--rc); }
+.rcard.sel { border-color:var(--rc); box-shadow:0 0 0 1px var(--rc), 0 0 22px color-mix(in srgb, var(--rc) 25%, transparent); }
+.rhead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; } .rhead .tag { margin-left:auto; }
+.swatch { width:14px; height:14px; border-radius:50%; flex:none; }
+.facts { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:13px; color:var(--mute); margin:6px 0; }
+.facts b { color:var(--ink); font:600 15px var(--mono); }
+.ltsbar { display:flex; height:7px; border-radius:4px; overflow:hidden; background:#222; margin:6px 0 8px; }
+.ltsbar span { display:block; height:100%; }
+.rates { display:grid; gap:2px; margin:6px 0; }
+.rate { display:grid; grid-template-columns:70px 1fr 34px; gap:8px; align-items:center; font-size:12px; color:var(--mute); }
+.rate i { height:6px; background:#1a2140; border-radius:3px; overflow:hidden; } .rate i b { display:block; height:100%; background:var(--accent3); }
+.rate.all { color:var(--ink); } .rate.all i b { background:var(--accent); }
+.rate em { font:600 12px var(--mono); font-style:normal; color:var(--ink); text-align:right; }
+.cues { padding-left:22px; font-size:14px; max-height:340px; overflow-y:auto; } .cues li { margin:3px 0; }
+.cues .km { font:12px var(--mono); color:var(--mute); display:inline-block; min-width:64px; }
+.cues .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
+.elev { width:100%; height:120px; background:rgba(3,5,10,.9); border:1px solid var(--line); border-radius:4px; }
+.elev .fill { fill:color-mix(in srgb, var(--accent) 18%, transparent); } .elev .ln { fill:none; stroke:var(--accent); stroke-width:2; vector-effect:non-scaling-stroke; }
+.elev text { fill:var(--mute); font:11px var(--mono); }
+.warnc { color:var(--warn); }
+
+/* scoring */
+.fields { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:0 10px; }
+.ltsbig { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
+.ltsbig b { font:700 26px var(--mono); padding:6px 14px; border-radius:6px; background:var(--lc); color:#fff; text-shadow:0 1px 2px #000; }
+
+@media (max-width:860px) {
+  .plan, .hero.split { grid-template-columns:minmax(0,1fr); }
+  .plan > div:last-child { order:-1; }                       /* map first on a phone */
+  .mapwrap canvas { height:min(var(--maph, 560px), 64vh) !important; }
+}

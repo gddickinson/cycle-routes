@@ -47,6 +47,7 @@ works in any city covered by OpenStreetMap.
 - [Feature tour](#feature-tour)
 - [How it works](#how-it-works)
 - [Quick start](#quick-start)
+- [Web demo & static site](#web-demo--static-site)
 - [Using it on a phone](#using-it-on-a-phone)
 - [Command line](#command-line)
 - [Open data sources](#open-data-sources)
@@ -270,6 +271,41 @@ docker run --rm -v "$PWD/data_cache:/app/data_cache" cycleroutes build
 docker run --rm -p 8000:8000 -v "$PWD/data_cache:/app/data_cache" cycleroutes
 ```
 
+## Web demo & static site
+A showcase of the routing engine runs entirely in the browser, on a demo area that was downloaded once from
+OpenStreetMap: **Prospect Park, Brooklyn** (1.6 km radius, 146.5 km of rideable streets and paths). It is published as
+a static GitHub Pages site and also runs locally:
+
+```bash
+pip install -r requirements-web.txt     # fastapi, uvicorn, numpy, networkx, shapely (no GIS stack needed)
+python run_web.py                       # → http://127.0.0.1:8184
+python scripts/build_static.py          # the static site, in site/
+```
+
+- **Plan a ride:** tap two points (or pick a park) for one route per riding style, or a loop of any length, with
+  bike type, after-dark, wind, roads to avoid and bike-lanes-only options; rated cards, directions and elevation.
+- **Example routes:** A→B alternatives between parks and suggested loops computed by the Python router.
+- **Street scores:** type a street's OSM tags and see its traffic stress (LTS) and scores; the weights of every style.
+- **Your area:** how to build any city and open it in the full planner (`cycleroutes serve`).
+
+The scoring, router (the same bidirectional Dijkstra as networkx), loops, ratings and cue sheet are ported to
+JavaScript (`cycleroutes/web/static/`), with every weight and table exported from the Python modules. A node test
+(`engine.test.mjs`) requires the browser to reproduce the Python exactly on the demo area: 104 A→B routes under six
+riding contexts, 11 loops, 646 scored streets, risky crossings and cue sheets. In the local app every result can also
+be checked against the Python router with one click. Route generation for a **new** area needs OpenStreetMap
+downloads, so it runs only in the full local app; the static site never contacts Overpass or a tile server (the map
+draws the OpenStreetMap streets itself). The demo graph is refreshed with `cycleroutes build --name prospect_park
+--lat 40.6602 --lon -73.9690 --radius 1600` followed by `python scripts/make_demo_area.py`. Map data © OpenStreetMap
+contributors (ODbL).
+
+<table><tr>
+<td width="50%"><img src="docs/img/explore.png" alt="Plan a ride: four rated routes from the Parade Ground to Mount Prospect Park on the street map coloured by traffic stress"></td>
+<td width="50%"><img src="docs/img/examples.png" alt="Example routes computed by the Python router, re-rated in the browser"></td>
+</tr><tr>
+<td width="50%"><img src="docs/img/home.png" alt="Home page with the demo network and its numbers"></td>
+<td width="50%"><img src="docs/img/scoring.png" alt="Street scores: OSM tags to traffic stress and 0-1 scores"></td>
+</tr></table>
+
 ## Using it on a phone
 Browsers only allow GPS over HTTPS, so start the server with
 `cycleroutes serve --host 0.0.0.0 --https` and open `https://<your-computer-ip>:8000`
@@ -337,6 +373,7 @@ cycleroutes/
   tracking/    GPS providers, ride store, navigation, map matching
   offline/     local vector basemap, backups
   devtools/    automated screenshot tests
+  web/         showcase web app + static site on the demo area (JS port of the engine)
 web/           Leaflet client, PWA and service worker (no build step)
 tests/         offline unit & API tests
 hardware/      Arduino NMEA GPS sketch
@@ -346,7 +383,8 @@ hardware/      Arduino NMEA GPS sketch
 
 ## Testing
 ```bash
-.venv/bin/python -m pytest -q                         # 79 offline unit/API tests
+.venv/bin/python -m pytest -q                         # 79 offline unit/API tests + 16 web tests
+python -m pytest -q tests/test_web.py                 # web tests only (requirements-web.txt is enough; runs the node engine test)
 .venv/bin/cycleroutes screenshots --out screenshots   # UI test run
 ```
 The screenshot run drives the app in headless Chrome at desktop and phone sizes and in
